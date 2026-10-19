@@ -1,0 +1,77 @@
+rules_version = '2';
+// Reglas de seguridad de ERP Socorro. Se pegan en Firebase → Firestore Database → Reglas → Publicar.
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function miDoc() { return get(/databases/$(db)/documents/usuarios/$(request.auth.uid)).data; }
+    function activo() {
+      return request.auth != null
+        && exists(/databases/$(db)/documents/usuarios/$(request.auth.uid))
+        && miDoc().activo == true;
+    }
+    function rol(lista) { return activo() && miDoc().rol in lista; }
+    function esAdmin() { return rol(['ADMIN']); }
+    function soloCambia(campos) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(campos); }
+
+    // Marca de "ya se creó el administrador": se crea una sola vez
+    match /config/inicio {
+      allow get: if true;
+      allow create: if request.auth != null && existsAfter(/databases/$(db)/documents/usuarios/$(request.auth.uid));
+    }
+    // Listas de los formularios y clave de IA: las lee cualquier usuario activo, solo el administrador las cambia
+    match /config/listas { allow read: if activo(); allow write: if esAdmin(); }
+    match /config/ia { allow read: if activo(); allow write: if esAdmin(); }
+    // Correlativo de códigos de producto
+    match /config/contadores { allow read, write: if rol(['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN']); }
+
+    match /usuarios/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow read, update, delete: if esAdmin();
+      allow create: if esAdmin()
+        // Primera vez: quien configura el sistema se crea a sí mismo como administrador
+        || (request.auth != null && request.auth.uid == uid
+            && request.resource.data.rol == 'ADMIN'
+            && !exists(/databases/$(db)/documents/config/inicio)
+            && existsAfter(/databases/$(db)/documents/config/inicio));
+    }
+
+    // Facturas de servicios y de compras
+    match /comprobantes/{id} {
+      allow read: if activo();
+      allow create: if rol(['ADMIN', 'LOGISTICA', 'COMPRAS']);
+      allow update: if rol(['ADMIN', 'LOGISTICA', 'COMPRAS'])
+        || (rol(['GERENCIA']) && soloCambia(['aprobacion']));
+      allow delete: if esAdmin();
+    }
+    // Fotos o PDF de los comprobantes (reducidos en el navegador)
+    match /adjuntos/{id} {
+      allow read: if activo();
+      allow create: if rol(['ADMIN', 'LOGISTICA', 'COMPRAS'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.d is string && request.resource.data.d.size() < 1000000;
+      allow delete: if esAdmin() || (activo() && resource.data.uid == request.auth.uid);
+    }
+    match /proveedores/{ruc} {
+      allow read: if activo();
+      allow write: if rol(['ADMIN', 'LOGISTICA', 'COMPRAS']);
+    }
+
+    // Kardex
+    match /productos/{id} {
+      allow read: if activo();
+      allow create, update: if rol(['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN']);
+      allow delete: if esAdmin();
+    }
+    match /movimientos/{id} {
+      allow read: if activo();
+      allow create: if rol(['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN']);
+      allow update, delete: if false; // el kardex no se edita: se corrige con ajustes
+    }
+
+    // Personal
+    match /personal/{dni} {
+      allow read: if activo();
+      allow write: if rol(['ADMIN', 'RRHH']);
+    }
+  }
+}

@@ -6,99 +6,202 @@
 <title>ERP Socorro</title>
 <link rel="icon" href="logo.png">
 <style>
-/* Barra naranja arriba; a la izquierda la lista de personal, a la derecha la hoja A4 tal como se imprime */
+/* Barra naranja de marca arriba, menú de módulos a la izquierda, área de trabajo a la derecha */
 :root{
-  --marca:#fe6e00; --pri:#d95a00; --suave:#fff0e0; --fondo:#f7f5f2;
-  --borde:#e3e0dd; --texto:#2b2f33; --gris:#6b6f73; --rojo:#b3261e; --ambar:#8a5300;
+  --marca:#fe6e00; --pri:#d95a00; --pri-osc:#b84c00; --suave:#fff0e0; --suave2:#fffaf4;
+  --fondo:#f7f5f2; --blanco:#ffffff; --borde:#e3e0dd; --texto:#2b2f33; --gris:#6b6f73;
+  --rojo:#b3261e; --rojo-f:#fdecea; --ok:#1b7a4b; --ok-f:#e6f4ec; --ambar:#8a5300; --ambar-f:#fff4dc;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{font-family:Arial,Helvetica,sans-serif;background:var(--fondo);color:var(--texto);font-size:14px}
-input,select,button{font:inherit}
-button:focus-visible,input:focus-visible,select:focus-visible,.item:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+input,select,button,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+[hidden]{display:none!important}
+h2{font-size:19px;margin:0}
+h3{font-size:15px;margin:0 0 8px}
+.nota{color:var(--gris);font-size:12.5px;margin:4px 0 0}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.c{text-align:center}
 
-.top{background:var(--marca);color:#fff;display:flex;align-items:center;gap:12px;padding:10px 20px;height:56px}
-.top img{width:36px;height:36px;border-radius:8px;background:#fff}
+/* Botones */
+.btn{background:var(--pri);color:#fff;border:1px solid var(--pri);border-radius:6px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--pri-osc)}
+.btn.sec{background:var(--blanco);color:var(--pri)}
+.btn.sec:hover{background:var(--suave)}
+.btn.peligro{background:var(--blanco);color:var(--rojo);border-color:var(--rojo)}
+.btn.chico{padding:4px 9px;font-size:12.5px}
+.btn:disabled{opacity:.55;cursor:default}
+.lnk{background:none;border:0;color:var(--pri);cursor:pointer;padding:0;text-decoration:underline;font-size:12.5px}
+
+/* Vistas de acceso */
+.vista{min-height:100%}
+.centro{display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.caja-login{background:var(--blanco);border:1px solid var(--borde);border-radius:10px;padding:28px;width:min(380px,100%);display:flex;flex-direction:column;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.caja-login img{width:64px;height:64px;align-self:center}
+.caja-login h1{font-size:20px;text-align:center;margin:0}
+.caja-login p{margin:0;text-align:center;color:var(--gris);font-size:13px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--gris)}
+input,select,textarea{border:1px solid var(--borde);border-radius:6px;padding:7px 9px;background:var(--blanco);color:var(--texto);font-size:13.5px;min-width:0}
+input:disabled,select:disabled,textarea:disabled{background:#f4f2ef;color:#444}
+.msg{font-size:13px;color:var(--rojo);min-height:1em;text-align:center}
+
+/* App */
+.top{background:var(--marca);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px;height:54px;position:sticky;top:0;z-index:5}
+.top img{width:34px;height:34px;border-radius:8px;background:#fff}
 .top h1{font-size:18px;margin:0;letter-spacing:.3px}
-.top nav{margin-left:auto;display:flex;gap:6px}
-.top nav a{color:#fff;text-decoration:none;font-size:13px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,.18)}
-.top nav a.act{background:#fff;color:var(--pri);font-weight:bold}
+.top .yo{margin-left:auto;font-size:13px;text-align:right;line-height:1.2}
+.top .yo small{opacity:.85}
+.top button{background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12.5px}
+.top button:hover{background:rgba(255,255,255,.32)}
+.cuerpo{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100% - 54px)}
+.side{background:var(--blanco);border-right:1px solid var(--borde);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.side button{background:none;border:0;text-align:left;padding:9px 12px;border-radius:6px;cursor:pointer;font-size:13.5px;color:var(--texto)}
+.side button:hover{background:var(--suave2)}
+.side button.act{background:var(--suave);color:var(--pri-osc);font-weight:bold;box-shadow:inset 3px 0 var(--marca)}
+.side .grupo{font-size:11px;letter-spacing:.6px;color:var(--gris);padding:12px 12px 4px;text-transform:uppercase}
+.main{padding:20px 22px;min-width:0}
+.mod{display:flex;flex-direction:column;gap:14px}
+.cab{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.acc{display:flex;gap:8px;flex-wrap:wrap}
+.filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--blanco);border:1px solid var(--borde);border-radius:8px;padding:10px 12px}
+.filtros label{min-width:140px}
+.filtros .crece{flex:1;min-width:200px}
 
-.app{display:grid;grid-template-columns:340px 1fr;height:calc(100% - 56px)}
-.panel{background:#fff;border-right:1px solid var(--borde);display:flex;flex-direction:column;min-height:0}
-.filtros{padding:14px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--borde)}
-.filtros label{font-size:12px;color:var(--gris);display:flex;flex-direction:column;gap:4px}
-.filtros input,.filtros select{width:100%;padding:8px 10px;border:1px solid var(--borde);border-radius:6px;background:#fff}
-.est{font-size:12px;color:var(--gris);display:flex;justify-content:space-between;align-items:center;gap:8px}
-.lnk{background:none;border:0;color:var(--pri);cursor:pointer;padding:0;font-size:12px;text-decoration:underline}
-.lista{overflow:auto;flex:1}
-.item{padding:10px 14px;border-bottom:1px solid var(--borde);cursor:pointer;display:flex;flex-direction:column;gap:3px}
-.item:hover{background:#fffaf4}
-.item.sel{background:var(--suave);box-shadow:inset 3px 0 var(--marca)}
-.item b{font-size:13px}
-.item small{color:var(--gris);font-variant-numeric:tabular-nums}
-.chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:#fbe3e1;color:var(--rojo);margin-left:6px;font-weight:normal}
-.vacio{padding:20px 14px;color:var(--gris)}
+/* Tablas */
+.tabla{overflow:auto;background:var(--blanco);border:1px solid var(--borde);border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f3f1ee;text-align:left;font-size:12px;color:#555;padding:8px 9px;border-bottom:1px solid var(--borde);white-space:nowrap;position:sticky;top:0}
+td{padding:7px 9px;border-bottom:1px solid #efecea;vertical-align:top}
+tbody tr:hover{background:var(--suave2)}
+tr.sel{background:var(--suave)!important}
+tr.anulado td{color:#999;text-decoration:line-through}
+tr.anulado td:last-child{text-decoration:none}
+.vacio{padding:24px;text-align:center;color:var(--gris)}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:bold;letter-spacing:.2px}
+.pill.PENDIENTE{background:var(--ambar-f);color:var(--ambar)}
+.pill.APROBADO{background:var(--ok-f);color:var(--ok)}
+.pill.RECHAZADO,.pill.ANULADO{background:var(--rojo-f);color:var(--rojo)}
+.pill.ENTRADA{background:var(--ok-f);color:var(--ok)}
+.pill.SALIDA{background:var(--rojo-f);color:var(--rojo)}
+.pill.AJUSTE{background:#eceff3;color:#3d4a5c}
+.acciones{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 
-.visor{overflow:auto;padding:20px;min-width:0}
-.barra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 auto 12px;max-width:210mm}
-.barra .esp{flex:1}
-.btn{background:var(--pri);color:#fff;border:0;border-radius:6px;padding:8px 14px;cursor:pointer}
-.btn.sec{background:#fff;color:var(--pri);border:1px solid var(--pri)}
-.btn:disabled{opacity:.5;cursor:default}
-.aviso{max-width:210mm;margin:0 auto 10px;background:#fff7e6;border:1px solid #f0d49c;color:var(--ambar);padding:8px 12px;border-radius:6px;font-size:13px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.aviso select{padding:4px 6px;border:1px solid #e0c48a;border-radius:4px}
-.error{background:#fdecea;border-color:#f1b5b0;color:var(--rojo)}
+/* Tarjetas de resumen */
+.tarjetas{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.tarjeta{background:var(--blanco);border:1px solid var(--borde);border-radius:8px;padding:14px 16px}
+.tarjeta .k{font-size:12px;color:var(--gris)}
+.tarjeta .v{font-size:22px;font-weight:bold;margin-top:4px;font-variant-numeric:tabular-nums}
+.tarjeta .s{font-size:12px;color:var(--gris);margin-top:2px}
+.tarjeta.alerta{border-color:#f0d49c;background:var(--ambar-f)}
+.resumen{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--gris)}
+.resumen b{color:var(--texto)}
 
-/* ---------- Hoja A4 ---------- */
-.hoja{width:210mm;min-height:297mm;margin:0 auto 20px;background:#fff;padding:14mm 16mm;box-shadow:0 1px 4px rgba(0,0,0,.14);color:#000;font-size:10.5pt;line-height:1.35}
+/* Kardex */
+.dos{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:14px;align-items:start}
+.panel{background:var(--blanco);border:1px solid var(--borde);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel .tabla{border:0;border-radius:0;max-height:62vh}
+.ficha{display:flex;gap:16px;flex-wrap:wrap;font-size:13px}
+.ficha div b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
+
+/* Diálogos */
+dialog{border:0;border-radius:10px;padding:0;box-shadow:0 10px 40px rgba(0,0,0,.25);max-width:calc(100vw - 24px);color:var(--texto)}
+dialog::backdrop{background:rgba(30,25,20,.45)}
+.dlg-cab{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--borde);background:var(--fondo);position:sticky;top:0;z-index:2;flex-wrap:wrap}
+.dlg-cuerpo{padding:16px;display:flex;flex-direction:column;gap:12px}
+.dlg.grande{width:1280px;height:calc(100vh - 24px)}
+.dlg.grande form{display:flex;flex-direction:column;height:100%}
+.dlg.grande .dlg-cuerpo{overflow:auto;flex:1}
+.dlg.medio{width:620px}
+.comp{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:16px;align-items:start}
+.comp-img{position:sticky;top:0;display:flex;flex-direction:column;gap:8px}
+.drop{border:2px dashed #e0b48a;border-radius:8px;background:var(--suave2);min-height:300px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--gris);cursor:pointer;padding:10px;overflow:hidden}
+.drop.arrastre{background:var(--suave);border-color:var(--marca)}
+.drop img{max-width:100%;max-height:70vh;object-fit:contain}
+.drop iframe{width:100%;height:70vh;border:0}
+fieldset{border:1px solid var(--borde);border-radius:8px;padding:10px 12px;margin:0;min-width:0}
+legend{font-size:12px;font-weight:bold;color:var(--pri-osc);padding:0 6px;letter-spacing:.3px;text-transform:uppercase}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}
+.s2{grid-column:span 2}.s3{grid-column:span 3}.s4{grid-column:1/-1}
+table.lineas td{padding:3px 4px;vertical-align:middle}
+table.lineas input{width:100%;padding:5px 6px;font-size:13px}
+table.lineas .w6{width:70px}.w8{width:95px}
+table.lineas td.ancho{min-width:240px}
+table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor:pointer;padding:0 6px}
+.marca-prod{font-size:11px;display:block;margin-top:2px}
+.marca-prod.ok{color:var(--ok)}.marca-prod.nuevo{color:var(--ambar)}
+.totales{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;background:var(--suave2);border:1px solid var(--borde);border-radius:8px;padding:10px 12px}
+.totales div{font-size:12px;color:var(--gris)}
+.totales b{display:block;font-size:16px;color:var(--texto);font-variant-numeric:tabular-nums}
+.aviso{background:var(--ambar-f);border:1px solid #f0d49c;color:var(--ambar);padding:8px 12px;border-radius:6px;font-size:13px}
+.aviso.error{background:var(--rojo-f);border-color:#f1b5b0;color:var(--rojo)}
+.aviso.ok{background:var(--ok-f);border-color:#b8dcc7;color:var(--ok)}
+#toast{position:fixed;right:18px;bottom:18px;background:#2b2f33;color:#fff;padding:10px 16px;border-radius:8px;font-size:13.5px;opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none;z-index:50;max-width:min(420px,calc(100vw - 36px))}
+#toast.ver{opacity:1;transform:none}
+#toast.error{background:var(--rojo)}
+
+/* Cargo de entrega (hoja A4) */
+.cargo{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;align-items:start}
+.cargo .lista{max-height:68vh;overflow:auto}
+.persona{padding:9px 12px;border-bottom:1px solid var(--borde);cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.persona:hover{background:var(--suave2)}
+.persona.sel{background:var(--suave);box-shadow:inset 3px 0 var(--marca)}
+.persona b{font-size:13px}.persona small{color:var(--gris)}
+.chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:var(--rojo-f);color:var(--rojo);margin-left:6px;font-weight:normal}
+.visor{overflow:auto;min-width:0}
+.hoja{width:210mm;min-height:297mm;margin:0 auto 16px;background:#fff;padding:14mm 16mm;box-shadow:0 1px 4px rgba(0,0,0,.14);color:#000;font-size:10.5pt;line-height:1.35}
 .enc{display:flex;align-items:center;gap:14px;border-bottom:2px solid var(--marca);padding-bottom:8px}
 .enc img{width:20mm;height:20mm}
 .enc .t{flex:1;text-align:center}
 .enc h2{margin:0;font-size:14.5pt;letter-spacing:.4px}
 .enc .sub{font-size:9.5pt;color:#444;margin-top:3px}
 .enc .cod{width:20mm;font-size:8pt;color:#555;text-align:right}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:5px 22px;margin:10px 0 4px}
-.g2 .full{grid-column:1/-1}
+.hg2{display:grid;grid-template-columns:1fr 1fr;gap:5px 22px;margin:10px 0 4px}
+.hg2 .full{grid-column:1/-1}
 .campo{display:flex;gap:6px;align-items:baseline;min-width:0}
 .campo .k{font-weight:bold;white-space:nowrap}
 .campo .v{flex:1;border-bottom:1px solid #9a9a9a;min-height:1.35em;padding:0 3px;min-width:0}
 .hoja h3{font-size:10.5pt;background:var(--suave);padding:4px 8px;margin:12px 0 7px;border-left:3px solid var(--marca);letter-spacing:.3px}
-.hoja table{width:100%;border-collapse:collapse;font-size:9.5pt}
-.hoja th,.hoja td{border:1px solid #8a8a8a;padding:4px 5px;vertical-align:top}
+.hoja table{font-size:9.5pt}
+.hoja th,.hoja td{border:1px solid #8a8a8a;padding:4px 5px;position:static;background:none;color:#000}
 .hoja th{background:#f1efed;font-size:9pt}
-.hoja td.c{text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hoja td.c{text-align:center;white-space:nowrap}
 .const{font-size:9.5pt;text-align:justify;margin:0}
 .obs{border:1px solid #8a8a8a;min-height:16mm;padding:4px 6px;font-size:9.5pt}
 .firmas{display:grid;grid-template-columns:1fr 1fr;gap:18mm;margin-top:20mm}
 .firma .tit{font-weight:bold;text-align:center;margin-bottom:16mm}
 .firma .linea{border-top:1px solid #000;margin-bottom:6px}
 .firma .campo{margin-top:4px}
-[contenteditable]{outline:none;border-radius:2px}
+.hoja [contenteditable]{outline:none;border-radius:2px}
 .hoja [contenteditable]:hover{background:#fff8ef}
 .hoja [contenteditable]:focus{background:var(--suave)}
 .rev{color:var(--rojo);font-weight:bold}
-.rev::after{content:" ⚠";font-size:8pt}
-.dudoso{background:#fff7e6}
+.dudoso{background:var(--ambar-f)}
 
-@media (max-width:900px){
-  .app{grid-template-columns:1fr;height:auto}
-  .panel{max-height:55vh;border-right:0;border-bottom:1px solid var(--borde)}
-  .visor{padding:12px}
-  .top{padding:10px 14px}
-  .top nav{display:none}
+@media (max-width:1000px){
+  .cuerpo{grid-template-columns:1fr}
+  .side{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--borde);padding:8px}
+  .side .grupo{display:none}
+  .side button{white-space:nowrap}
+  .main{padding:14px}
+  .dos,.cargo,.comp{grid-template-columns:1fr}
+  .comp-img{position:static}
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .s3{grid-column:span 2}
+  .totales{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .top .yo small{display:none}
 }
 
 @media print{
   @page{size:A4;margin:0}
   html,body{height:auto;background:#fff}
-  .top,.panel,.barra,.aviso{display:none!important}
-  .app{display:block;height:auto}
-  .visor{padding:0;overflow:visible}
+  .top,.side,#m-cargo .cab,#m-cargo .panel,#m-cargo .avisos,#toast{display:none!important}
+  .cuerpo,.main,.mod,.cargo{display:block;padding:0;margin:0}
+  .visor{overflow:visible}
   .hoja{box-shadow:none;margin:0;break-after:page;min-height:auto;height:297mm}
   .hoja:last-child{break-after:auto}
   .rev{color:inherit;font-weight:normal}
-  .rev::after{content:""}
   .dudoso{background:none}
   .hoja [contenteditable]:hover,.hoja [contenteditable]:focus{background:none}
 }
@@ -106,272 +209,278 @@ button:focus-visible,input:focus-visible,select:focus-visible,.item:focus-visibl
 </head>
 <body>
 
-<header class="top">
-  <img src="logo.png" alt="Farmacia Socorro">
-  <h1>ERP Socorro</h1>
-  <nav aria-label="Módulos"><a href="#" class="act">Cargo de entrega de útiles</a></nav>
-</header>
+<!-- Cargando -->
+<div id="vCarga" class="vista centro"><div class="caja-login"><img src="logo.png" alt=""><p>Cargando ERP Socorro…</p></div></div>
 
-<div class="app">
-  <aside class="panel">
-    <div class="filtros">
-      <label for="q">Buscar trabajador
-        <input id="q" type="search" placeholder="Nombre o DNI" autocomplete="off">
-      </label>
-      <label for="fsuc">Sucursal
-        <select id="fsuc"><option value="">Todas</option></select>
-      </label>
-      <div class="est"><span id="estado">Cargando datos…</span><button class="lnk" id="recargar" type="button">Actualizar</button></div>
-    </div>
-    <div class="lista" id="lista" role="listbox" aria-label="Personal"></div>
-  </aside>
-
-  <main class="visor">
-    <div class="barra">
-      <button class="btn" id="imprimir" type="button" disabled>Imprimir cargo</button>
-      <button class="btn sec" id="imprimirTodos" type="button" disabled>Imprimir todos (filtro actual)</button>
-      <span class="esp"></span>
-      <span style="font-size:12px;color:var(--gris)">Puedes corregir cualquier dato haciendo clic sobre la hoja.</span>
-    </div>
-    <div id="avisos"></div>
-    <div id="hojas"><div class="hoja" style="display:flex;align-items:center;justify-content:center;color:#888">Selecciona un trabajador de la lista.</div></div>
-  </main>
+<!-- Falta conectar Firebase -->
+<div id="vSinConfig" class="vista centro" hidden>
+  <div class="caja-login">
+    <img src="logo.png" alt="">
+    <h1>ERP Socorro</h1>
+    <p>Falta conectar la base de datos. Pega la configuración del proyecto Firebase "ERP Socorro" en el archivo <b>firebase-config.js</b> del repositorio.</p>
+  </div>
 </div>
 
-<script>
-// ---------- Configuración ----------
-const SHEET_ID = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
-const EMPRESA = { nombre: 'FS SOCORRO S.A.C.', ruc: '20486562341' };
-// Prendas del formulario: [texto que aparece en la pregunta, nombre en el cargo]
-const PRENDAS = [
-  ['moñera','Moñera'], ['collet','Collet'], ['chompa','Chompa'], ['casaca','Casaca'],
-  ['buzo deportivo','Buzo deportivo'], ['fotocheck','Fotocheck'], ['chaqueta logueada','Chaqueta logueada'],
-  ['mangas','Mangas'], ['chaleco de seguridad','Chaleco de seguridad'], ['guantes de seguridad','Guantes de seguridad'],
-  ['faja de seguridad','Faja de seguridad'], ['fotochek','Fotocheck']
-];
+<!-- Primera vez: crear administrador -->
+<div id="vInicio" class="vista centro" hidden>
+  <form id="fIni" class="caja-login" autocomplete="off">
+    <img src="logo.png" alt="">
+    <h1>Configurar ERP Socorro</h1>
+    <p>Es la primera vez que se usa. Crea la cuenta del administrador.</p>
+    <label>Nombre completo<input id="iNom" required maxlength="80"></label>
+    <label>Usuario (sin espacios)<input id="iUsr" required maxlength="30" autocapitalize="none"></label>
+    <label>Contraseña (mínimo 6)<input id="iClave" type="password" required minlength="6"></label>
+    <label>Repite la contraseña<input id="iClave2" type="password" required minlength="6"></label>
+    <button class="btn" type="submit">Crear administrador</button>
+    <div class="msg" id="iniMsg"></div>
+  </form>
+</div>
 
-// ---------- Utilidades ----------
-const $ = s => document.querySelector(s);
-const norm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const limpio = s => String(s ?? '').replace(/\s+/g,' ').trim();
-const store = {
-  get(k){ try { return localStorage.getItem('erp_' + k) || ''; } catch(e){ return ''; } },
-  set(k,v){ try { localStorage.setItem('erp_' + k, v); } catch(e){} }
-};
-function hoyTxt(){ const d = new Date(); return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }
-// gviz devuelve fechas como "Date(2026,9,17,14,13,45)" (mes desde 0)
-function gvizFecha(v){
-  const m = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/.exec(String(v||''));
-  if(!m) return null;
-  const d = new Date(+m[1], +m[2], +m[3], +(m[4]||0), +(m[5]||0), +(m[6]||0));
-  d.setFullYear(+m[1]); // años como 0026 no deben convertirse en 1926
-  return d;
-}
+<!-- Ingreso -->
+<div id="vLogin" class="vista centro" hidden>
+  <form id="fLogin" class="caja-login">
+    <img src="logo.png" alt="">
+    <h1>ERP Socorro</h1>
+    <p>Farmacia Socorro</p>
+    <label>Usuario<input id="lu" required maxlength="30" autocapitalize="none" autocomplete="username"></label>
+    <label>Contraseña<input id="lc" type="password" required autocomplete="current-password"></label>
+    <button class="btn" type="submit">Ingresar</button>
+    <div class="msg" id="loginMsg"></div>
+  </form>
+</div>
 
-// ---------- Estado ----------
-let COLS = [], MAPA = null, PERSONAS = [], selDni = null, selResp = {};
+<!-- Aplicación -->
+<div id="vApp" class="vista" hidden>
+  <header class="top">
+    <img src="logo.png" alt="Farmacia Socorro">
+    <h1>ERP Socorro</h1>
+    <div class="yo"><span id="yoNombre"></span><br><small id="yoRol"></small></div>
+    <button type="button" id="bClave">Cambiar contraseña</button>
+    <button type="button" id="bSalir">Salir</button>
+  </header>
+  <div class="cuerpo">
+    <nav class="side" id="menu" aria-label="Módulos"></nav>
+    <main class="main">
 
-function mapear(cols){
-  const m = { ts:-1, nombre:-1, dni:-1, suc:-1,
-    items: PRENDAS.map(([k,n]) => ({ k:norm(k), n, rec:-1, fecha:-1, estado:-1, obs:-1, talla:-1 })) };
-  let ultimo = null;
-  cols.forEach((c,i) => {
-    const h = norm(c.label);
-    if(h === 'marca temporal'){ m.ts = i; return; }
-    if(h === 'nombre completo'){ m.nombre = i; return; }
-    if(h === 'dni'){ m.dni = i; return; }
-    if(h === 'sucursal'){ m.suc = i; return; }
-    let it = m.items.find(x => h.includes(x.k));
-    if(!it) it = ultimo;            // p. ej. "¿En qué estado se encuentra?" sin nombre de prenda
-    if(!it) return;
-    ultimo = it;
-    const rol = h.includes('talla') ? 'talla'
-      : h.includes('usted recibio') ? 'rec'
-      : h.includes('fecha') ? 'fecha'
-      : h.includes('estado') ? 'estado'
-      : h.includes('observacion') ? 'obs' : null;
-    if(rol && it[rol] === -1) it[rol] = i;
-  });
-  return m;
-}
+      <!-- Inicio -->
+      <section id="m-inicio" class="mod" hidden>
+        <div class="cab"><div><h2>Resumen del mes</h2><p class="nota" id="iniMes"></p></div>
+          <div class="acc"><input type="month" id="iniSelMes" aria-label="Mes"></div></div>
+        <div class="tarjetas" id="iniTarjetas"></div>
+        <h3>Últimos comprobantes registrados</h3>
+        <div class="tabla"><table><thead><tr><th>Registro</th><th>Clase</th><th>Documento</th><th>Proveedor</th><th class="num">Total</th><th>Aprobación</th><th>Registró</th></tr></thead><tbody id="iniUlt"></tbody></table></div>
+      </section>
 
-const celda = (row,i) => (i < 0 || !row.c || !row.c[i]) ? null : row.c[i];
-const txt = (row,i) => { const c = celda(row,i); if(!c || c.v === null || c.v === undefined) return ''; return limpio(c.f ?? c.v); };
+      <section id="m-servicios" class="mod" hidden></section>
+      <section id="m-compras" class="mod" hidden></section>
 
-function dniDe(row){
-  const c = celda(row, MAPA.dni); if(!c || c.v === null) return '';
-  return typeof c.v === 'number' ? String(Math.round(c.v)).padStart(8,'0') : limpio(c.v).padStart(8,'0');
-}
+      <!-- Kardex -->
+      <section id="m-kardex" class="mod" hidden>
+        <div class="cab"><div><h2>Kardex</h2><p class="nota">Almacén único. Costo promedio ponderado, valores sin IGV.</p></div>
+          <div class="acc"><button class="btn" type="button" id="kMov">Registrar salida / ajuste</button><button class="btn sec" type="button" id="kCsvProd">Exportar productos</button><button class="btn sec" type="button" id="kCsvTodo">Exportar kardex completo</button></div></div>
+        <div class="tarjetas" id="kTarjetas"></div>
+        <div class="dos">
+          <div class="panel">
+            <input type="search" id="kBuscar" placeholder="Buscar producto por código o nombre" aria-label="Buscar producto">
+            <div class="tabla"><table><thead><tr><th>Código</th><th>Producto</th><th class="num">Stock</th><th class="num">C. prom.</th><th class="num">Valor</th></tr></thead><tbody id="kProds"></tbody></table></div>
+          </div>
+          <div class="panel" id="kDet"><div class="vacio">Elige un producto para ver su kardex.</div></div>
+        </div>
+      </section>
 
-function fechaDudosa(row,i){
-  const c = celda(row,i); if(!c || !c.v) return false;
-  const d = gvizFecha(c.v); if(!d) return false;
-  const y = d.getFullYear();
-  return y < 2020 || d > new Date();
-}
+      <!-- RRHH -->
+      <section id="m-rrhh" class="mod" hidden>
+        <div class="cab"><div><h2>Personal</h2><p class="nota">Datos del personal de todas las sucursales.</p></div>
+          <div class="acc"><button class="btn" type="button" id="pNuevo">+ Nuevo trabajador</button><button class="btn sec" type="button" id="pImportar">Importar del formulario de uniformes</button><button class="btn sec" type="button" id="pCsv">Exportar Excel</button></div></div>
+        <div class="filtros"><label>Área / sucursal<select id="pfArea"></select></label><label>Estado<select id="pfEstado"><option value="ACTIVO">Activos</option><option value="CESADO">Cesados</option><option value="">Todos</option></select></label><label class="crece">Buscar<input type="search" id="pfQ" placeholder="Nombre, DNI o cargo"></label></div>
+        <div class="resumen" id="pRes"></div>
+        <div class="tabla"><table><thead><tr><th>DNI</th><th>Apellidos y nombres</th><th>Cargo</th><th>Área / sucursal</th><th>Empresa</th><th>Ingreso</th><th>Celular</th><th>Estado</th><th></th></tr></thead><tbody id="pFilas"></tbody></table></div>
+      </section>
 
-function prendasDe(row){
-  return MAPA.items.map(it => {
-    const rec = norm(txt(row,it.rec));
-    const fecha = txt(row,it.fecha), est = txt(row,it.estado), obs = txt(row,it.obs), talla = txt(row,it.talla);
-    const si = rec === 'si';
-    const dudoso = !rec && !!(fecha || est);   // respondió fecha/estado sin marcar "Sí"
-    if(!si && !dudoso) return null;
-    return { n:it.n, fecha, fechaRev:fechaDudosa(row,it.fecha), est, obs, talla, dudoso };
-  }).filter(Boolean);
-}
+      <!-- Cargo de entrega -->
+      <section id="m-cargo" class="mod" hidden>
+        <div class="cab"><div><h2>Cargo de entrega de útiles de trabajo</h2><p class="nota">Toma el personal de RR. HH. y lo que respondió en el formulario de uniformes. Haz clic en la hoja para corregir antes de imprimir.</p></div>
+          <div class="acc"><button class="btn" type="button" id="gImprimir" disabled>Imprimir cargo</button><button class="btn sec" type="button" id="gTodos" disabled>Imprimir todos</button><button class="btn sec" type="button" id="gRecargar">Actualizar respuestas</button></div></div>
+        <div class="cargo">
+          <div class="panel">
+            <input type="search" id="gQ" placeholder="Nombre o DNI" aria-label="Buscar trabajador">
+            <select id="gSuc" aria-label="Sucursal"><option value="">Todas las sucursales</option></select>
+            <div class="nota" id="gEstado">Cargando…</div>
+            <div class="lista" id="gLista"></div>
+          </div>
+          <div class="visor">
+            <div class="avisos" id="gAvisos"></div>
+            <div id="gHojas"><div class="hoja" style="display:flex;align-items:center;justify-content:center;color:#888">Selecciona un trabajador de la lista.</div></div>
+          </div>
+        </div>
+      </section>
 
-// ---------- Carga ----------
-async function cargar(){
-  $('#estado').textContent = 'Cargando datos…';
-  try{
-    const url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:json&headers=1&t=' + Date.now();
-    const r = await fetch(url);
-    const t = await r.text();
-    const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1));
-    if(j.status !== 'ok') throw new Error('respuesta de Google: ' + (j.errors?.[0]?.detailed_message || j.status));
-    COLS = j.table.cols; MAPA = mapear(COLS);
-    const grupos = new Map();
-    j.table.rows.forEach(row => {
-      const dni = dniDe(row); const nombre = txt(row,MAPA.nombre);
-      if(!dni && !nombre) return;
-      const ts = gvizFecha(celda(row,MAPA.ts)?.v) || new Date(0);
-      const key = dni || nombre;
-      if(!grupos.has(key)) grupos.set(key, []);
-      grupos.get(key).push({ row, ts, tsTxt: txt(row,MAPA.ts), dni, nombre, suc: txt(row,MAPA.suc) });
-    });
-    PERSONAS = [...grupos.entries()].map(([key, resp]) => {
-      resp.sort((a,b) => b.ts - a.ts);
-      return { key, resp, nombre: resp[0].nombre, dni: resp[0].dni, suc: resp[0].suc };
-    }).sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
-    const sucs = [...new Set(PERSONAS.map(p => p.suc).filter(Boolean))].sort((a,b) => a.localeCompare(b,'es'));
-    const fs = $('#fsuc'), prev = fs.value;
-    fs.innerHTML = '<option value="">Todas</option>' + sucs.map(s => '<option>' + esc(s) + '</option>').join('');
-    fs.value = sucs.includes(prev) ? prev : '';
-    $('#estado').textContent = PERSONAS.length + ' trabajadores · ' + j.table.rows.length + ' respuestas';
-    pintarLista();
-    if(selDni && PERSONAS.some(p => p.key === selDni)) mostrar(selDni);
-  }catch(e){
-    $('#estado').textContent = 'No se pudo cargar';
-    $('#avisos').innerHTML = '<div class="aviso error">No se pudieron leer las respuestas del Google Sheets (' + esc(e.message) + '). Revisa que la hoja siga compartida como "Cualquier persona con el enlace" y pulsa Actualizar.</div>';
-  }
-}
+      <!-- Usuarios -->
+      <section id="m-usuarios" class="mod" hidden>
+        <div class="cab"><div><h2>Usuarios</h2><p class="nota">Cada persona entra con su usuario y contraseña. El rol define qué módulos ve y qué puede registrar.</p></div>
+          <div class="acc"><button class="btn" type="button" id="uNuevo">+ Nuevo usuario</button></div></div>
+        <div class="tabla"><table><thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th></th></tr></thead><tbody id="uFilas"></tbody></table></div>
+        <div class="aviso" id="uRoles"></div>
+      </section>
 
-function filtradas(){
-  const q = norm($('#q').value), s = $('#fsuc').value;
-  return PERSONAS.filter(p => (!s || p.suc === s) && (!q || norm(p.nombre).includes(q) || p.dni.includes(q)));
-}
+      <!-- Configuración -->
+      <section id="m-config" class="mod" hidden>
+        <div class="cab"><div><h2>Configuración</h2><p class="nota">Listas que se usan en los formularios y la clave para leer facturas con IA.</p></div>
+          <div class="acc"><button class="btn" type="button" id="cfGuardar">Guardar configuración</button></div></div>
+        <fieldset><legend>Lectura de facturas con IA (Google Gemini)</legend>
+          <div class="g2">
+            <label>Clave de API de Gemini<input id="cfClave" type="password" autocomplete="off" placeholder="Pega aquí la clave de Google AI Studio"></label>
+            <label>Modelo<input id="cfModelo" placeholder="gemini-2.5-flash"></label>
+          </div>
+          <p class="nota">La clave se guarda en la base de datos (no en el código público) y solo la usan los usuarios que inician sesión. Se obtiene gratis en aistudio.google.com → Get API key.</p>
+        </fieldset>
+        <div class="g2">
+          <label>Empresas (una por línea: NOMBRE | RUC)<textarea id="cfEmpresas" rows="4"></textarea></label>
+          <label>Áreas, sucursales y centros de costo<textarea id="cfAreas" rows="4"></textarea></label>
+          <label>Tipos de gasto<textarea id="cfGastos" rows="4"></textarea></label>
+          <label>Formas de pago<textarea id="cfFormas" rows="4"></textarea></label>
+          <label>Condiciones de pago<textarea id="cfCond" rows="4"></textarea></label>
+          <label>Unidades de medida<textarea id="cfUnid" rows="4"></textarea></label>
+          <label>Cargos del personal<textarea id="cfCargos" rows="4"></textarea></label>
+        </div>
+      </section>
 
-function pintarLista(){
-  const l = filtradas();
-  $('#lista').innerHTML = l.length ? l.map(p =>
-    '<div class="item' + (p.key === selDni ? ' sel' : '') + '" role="option" tabindex="0" data-k="' + esc(p.key) + '">' +
-      '<b>' + esc(p.nombre) + (p.resp.length > 1 ? '<span class="chip">' + p.resp.length + ' respuestas</span>' : '') + '</b>' +
-      '<small>DNI ' + esc(p.dni) + ' · ' + esc(p.suc) + '</small></div>').join('')
-    : '<div class="vacio">No hay trabajadores con ese filtro.</div>';
-  $('#imprimirTodos').disabled = !l.length;
-  $('#imprimirTodos').textContent = 'Imprimir todos (' + l.length + ')';
-}
+    </main>
+  </div>
+</div>
 
-// ---------- Hoja ----------
-function campo(k, v, opts = {}){
-  return '<div class="campo' + (opts.full ? ' full' : '') + '"><span class="k">' + k + ':</span><span class="v" contenteditable="true"' +
-    (opts.id ? ' data-guardar="' + opts.id + '"' : '') + '>' + esc(v) + '</span></div>';
-}
+<!-- Diálogo: comprobante (servicio o compra) -->
+<dialog id="dComp" class="dlg grande" aria-labelledby="cTit">
+  <form id="fComp" novalidate>
+    <div class="dlg-cab"><h2 id="cTit">Nuevo ingreso</h2>
+      <div class="acc"><button type="button" class="btn sec" id="cIA">Leer con IA</button><button type="submit" class="btn" id="cGuardar">Guardar</button><button type="button" class="btn sec" id="cCerrar">Cerrar</button></div></div>
+    <div class="dlg-cuerpo">
+      <div class="aviso" id="cMsg" hidden></div>
+      <div class="comp">
+        <div class="comp-img">
+          <label class="drop" id="cDrop" for="cFile"><span id="cDropTxt">Arrastra aquí la foto o el PDF de la factura,<br>haz clic para elegirla o pégala con Ctrl+V</span><img id="cPrev" hidden alt="Comprobante"><iframe id="cPrevPdf" hidden title="Comprobante en PDF"></iframe></label>
+          <input type="file" id="cFile" accept="image/*,application/pdf" hidden>
+          <div class="acc"><button type="button" class="btn sec chico" id="cCambiar">Cambiar imagen</button><button type="button" class="btn sec chico" id="cAmpliar">Ver en grande</button></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <fieldset><legend>Información</legend><div class="g4">
+            <label>Tipo<select id="cTipo"></select></label>
+            <label>Serie<input id="cSerie" maxlength="8"></label>
+            <label>Número<input id="cNum" maxlength="12" inputmode="numeric"></label>
+            <label>Fecha de emisión<input id="cFecha" type="date"></label>
+            <label>RUC / DNI proveedor<input id="cRuc" list="dlProv" maxlength="11" inputmode="numeric"></label>
+            <label class="s3">Proveedor<input id="cRazon" maxlength="150"></label>
+            <label>Condición de pago<select id="cCond"></select></label>
+            <label>Vencimiento<input id="cVence" type="date"></label>
+            <label>Forma de pago<select id="cForma"></select></label>
+            <label>Moneda<select id="cMoneda"><option value="PEN">Soles (S/)</option><option value="USD">Dólares (US$)</option></select></label>
+            <label>Tipo de gasto<select id="cGasto"></select></label>
+            <label>Centro de costos<select id="cCentro"></select></label>
+            <label>¿Afecto a IGV?<select id="cIgv"><option>SI</option><option>NO</option></select></label>
+            <label>¿Es contable?<select id="cCont"><option>SI</option><option>NO</option></select></label>
+            <label>¿Detracción?<select id="cDet"><option>NO</option><option>SI</option></select></label>
+            <label>% detracción<input id="cDetPct" type="number" min="0" max="100" step="0.01"></label>
+            <label class="s2">Empresa<select id="cEmpresa"></select></label>
+            <label>Destino<select id="cDestino"></select></label>
+            <label>N.º solicitud<input id="cSol" maxlength="20"></label>
+            <label class="s4">Anotaciones<input id="cNotas" maxlength="300"></label>
+          </div></fieldset>
+          <fieldset><legend>Detalle</legend>
+            <div class="tabla" style="border:0"><table class="lineas"><thead id="cLinHead"></thead><tbody id="cLineas"></tbody></table></div>
+            <button type="button" class="btn sec chico" id="cAddLin" style="margin-top:8px">+ Agregar ítem</button>
+          </fieldset>
+          <div class="totales">
+            <div>Subtotal<b id="tSub">0.00</b></div>
+            <div>IGV<b id="tIgv">0.00</b></div>
+            <div>Total factura<b id="tTot">0.00</b></div>
+            <div>Detracción<b id="tDet">0.00</b></div>
+            <div>Total a pagar<b id="tPagar">0.00</b></div>
+          </div>
+          <div id="cAprob" class="nota"></div>
+        </div>
+      </div>
+    </div>
+  </form>
+</dialog>
 
-function hojaHTML(p, r){
-  const prendas = prendasDe(r.row);
-  const nombre = r.nombre.toUpperCase();
-  const filas = prendas.length ? prendas.map((x,i) => {
-    const estObs = [x.est, x.obs].filter(Boolean).map(esc).join(' – ');
-    return '<tr' + (x.dudoso ? ' class="dudoso" title="En el formulario no marcó que la recibió, pero llenó fecha o estado"' : '') + '>' +
-      '<td class="c">' + (i+1) + '</td>' +
-      '<td contenteditable="true">' + esc(x.n) + '</td>' +
-      '<td class="c" contenteditable="true">' + esc(x.talla) + '</td>' +
-      '<td class="c" contenteditable="true">1</td>' +
-      '<td class="c" contenteditable="true">UND</td>' +
-      '<td class="c' + (x.fechaRev ? ' rev' : '') + '" contenteditable="true">' + esc(x.fecha) + '</td>' +
-      '<td contenteditable="true">' + estObs + '</td></tr>';
-  }).join('') : '<tr><td colspan="7" style="text-align:center;color:#666">El trabajador indicó que no recibió ninguna prenda.</td></tr>';
-  const extra = Math.max(0, 5 - prendas.length);
-  const vacias = Array.from({length: extra}, (_,i) => '<tr><td class="c">' + (prendas.length + i + 1) + '</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>').join('');
+<!-- Diálogo: ver imagen -->
+<dialog id="dImg" class="dlg grande" aria-label="Comprobante">
+  <div style="display:flex;flex-direction:column;height:100%">
+    <div class="dlg-cab"><h2>Comprobante</h2><button type="button" class="btn sec" id="imgCerrar">Cerrar</button></div>
+    <div class="dlg-cuerpo" id="imgCuerpo" style="flex:1;overflow:auto;align-items:center"></div>
+  </div>
+</dialog>
 
-  return '<section class="hoja">' +
-    '<div class="enc"><img src="logo.png" alt=""><div class="t"><h2>CARGO DE ENTREGA DE ÚTILES DE TRABAJO</h2>' +
-      '<div class="sub">' + esc(EMPRESA.nombre) + ' · RUC ' + esc(EMPRESA.ruc) + '</div></div>' +
-      '<div class="cod">Resp. ' + esc(r.tsTxt.split(' ')[0]) + '</div></div>' +
-    '<div class="g2">' +
-      campo('Empresa', EMPRESA.nombre) + campo('RUC', EMPRESA.ruc) +
-      campo('Área', r.suc) + campo('Fecha de entrega', hoyTxt()) +
-    '</div>' +
-    '<h3>DATOS DEL TRABAJADOR</h3>' +
-    '<div class="g2">' +
-      campo('Nombres y apellidos', nombre, {full:true}) +
-      campo('DNI', r.dni) + campo('Cargo', '') +
-      campo('Área de trabajo', r.suc, {full:true}) +
-    '</div>' +
-    '<h3>DETALLE DE LOS ÚTILES ENTREGADOS</h3>' +
-    '<table><thead><tr><th style="width:7mm">N.º</th><th>Descripción del útil</th><th style="width:12mm">Talla</th><th style="width:12mm">Cant.</th><th style="width:13mm">Unidad</th><th style="width:22mm">Fecha de recepción</th><th>Estado / Observaciones</th></tr></thead>' +
-    '<tbody>' + filas + vacias + '</tbody></table>' +
-    '<h3>CONSTANCIA DE RECEPCIÓN</h3>' +
-    '<p class="const">Declaro haber recibido los útiles de trabajo detallados en el presente documento, en las cantidades y condiciones indicadas, para el desarrollo de mis funciones laborales.</p>' +
-    '<h3>OBSERVACIONES</h3><div class="obs" contenteditable="true"></div>' +
-    '<div class="firmas">' +
-      '<div class="firma"><div class="tit">ENTREGUÉ CONFORME</div><div class="linea"></div>' +
-        campo('Firma', '') .replace('class="v" contenteditable="true"', 'class="v"') +
-        campo('Nombre', store.get('entrega_nombre'), {id:'entrega_nombre'}) +
-        campo('Cargo', store.get('entrega_cargo'), {id:'entrega_cargo'}) +
-        campo('Fecha', hoyTxt()) + '</div>' +
-      '<div class="firma"><div class="tit">RECIBÍ CONFORME</div><div class="linea"></div>' +
-        campo('Firma', '').replace('class="v" contenteditable="true"', 'class="v"') +
-        campo('Nombre', nombre) + campo('DNI', r.dni) + campo('Fecha', hoyTxt()) + '</div>' +
-    '</div></section>';
-}
+<!-- Diálogo: salida / ajuste de kardex -->
+<dialog id="dMov" class="dlg medio" aria-labelledby="mTit">
+  <form id="fMov">
+    <div class="dlg-cab"><h2 id="mTit">Salida o ajuste de kardex</h2><div class="acc"><button type="submit" class="btn">Registrar</button><button type="button" class="btn sec" id="mCerrar">Cancelar</button></div></div>
+    <div class="dlg-cuerpo">
+      <div class="g2">
+        <label class="s2">Producto<input id="mProd" list="dlProd" required></label>
+        <label>Movimiento<select id="mTipo"><option value="SALIDA">Salida (consumo o entrega)</option><option value="AJUSTE+">Ajuste de ingreso (+)</option><option value="AJUSTE-">Ajuste de salida (−)</option></select></label>
+        <label>Fecha<input id="mFecha" type="date" required></label>
+        <label>Cantidad<input id="mCant" type="number" step="any" min="0" required></label>
+        <label id="mCostoL" hidden>Costo unitario sin IGV<input id="mCosto" type="number" step="any" min="0"></label>
+        <label>Destino / área<select id="mDestino"></select></label>
+        <label>Entregado a (opcional)<input id="mPersona" list="dlPersonal"></label>
+        <label class="s2">Motivo / documento<input id="mMotivo" maxlength="200" required></label>
+      </div>
+      <div class="nota" id="mInfo"></div>
+      <div class="msg" id="mMsg" style="text-align:left"></div>
+    </div>
+  </form>
+</dialog>
 
-function mostrar(key){
-  selDni = key;
-  const p = PERSONAS.find(x => x.key === key); if(!p) return;
-  const idx = Math.min(selResp[key] || 0, p.resp.length - 1);
-  const r = p.resp[idx];
-  document.querySelectorAll('.item').forEach(el => el.classList.toggle('sel', el.dataset.k === key));
-  $('#hojas').innerHTML = hojaHTML(p, r);
-  const prendas = prendasDe(r.row);
-  const av = [];
-  if(p.resp.length > 1){
-    av.push('<div class="aviso">Este trabajador respondió ' + p.resp.length + ' veces. Usando la respuesta del ' +
-      '<select id="selResp" aria-label="Respuesta a usar">' + p.resp.map((x,i) => '<option value="' + i + '"' + (i === idx ? ' selected' : '') + '>' + esc(x.tsTxt) + (i === 0 ? ' (más reciente)' : '') + ' · ' + esc(x.suc) + '</option>').join('') + '</select></div>');
-  }
-  if(prendas.some(x => x.fechaRev)) av.push('<div class="aviso">Hay fechas de recepción imposibles o futuras (en rojo). Corrígelas haciendo clic sobre ellas antes de imprimir.</div>');
-  if(prendas.some(x => x.dudoso)) av.push('<div class="aviso">Algunas prendas (sombreadas) tienen fecha o estado, pero el trabajador no marcó que las recibió. Revísalas o bórralas antes de imprimir.</div>');
-  $('#avisos').innerHTML = av.join('');
-  const sr = $('#selResp'); if(sr) sr.onchange = () => { selResp[key] = +sr.value; mostrar(key); };
-  $('#imprimir').disabled = false;
-}
+<!-- Diálogo: trabajador -->
+<dialog id="dPer" class="dlg medio" aria-labelledby="pTit">
+  <form id="fPer">
+    <div class="dlg-cab"><h2 id="pTit">Trabajador</h2><div class="acc"><button type="submit" class="btn">Guardar</button><button type="button" class="btn sec" id="pCerrar">Cancelar</button></div></div>
+    <div class="dlg-cuerpo">
+      <div class="g2">
+        <label>DNI<input id="pDni" required maxlength="8" inputmode="numeric" pattern="[0-9]{8}"></label>
+        <label>Estado<select id="pEstado"><option>ACTIVO</option><option>CESADO</option></select></label>
+        <label class="s2">Apellidos y nombres<input id="pNombre" required maxlength="100"></label>
+        <label>Cargo<input id="pCargo" list="dlCargos" maxlength="60"></label>
+        <label>Área / sucursal<select id="pArea"></select></label>
+        <label>Empresa<select id="pEmpresa"></select></label>
+        <label>Fecha de ingreso<input id="pIngreso" type="date"></label>
+        <label>Fecha de nacimiento<input id="pNac" type="date"></label>
+        <label>Celular<input id="pCel" maxlength="15" inputmode="tel"></label>
+        <label class="s2">Correo<input id="pCorreo" type="email" maxlength="80"></label>
+        <label class="s2">Dirección<input id="pDir" maxlength="150"></label>
+        <label>Talla polo / chompa<input id="pTallaS" maxlength="5"></label>
+        <label>Talla pantalón / buzo<input id="pTallaP" maxlength="5"></label>
+        <label class="s2">Observaciones<textarea id="pObs" rows="2" maxlength="300"></textarea></label>
+      </div>
+      <div class="msg" id="pMsg" style="text-align:left"></div>
+    </div>
+  </form>
+</dialog>
 
-// Guardar nombre y cargo de quien entrega para no escribirlos cada vez
-document.addEventListener('input', e => {
-  const k = e.target.dataset && e.target.dataset.guardar;
-  if(k) store.set(k, e.target.textContent.trim());
-});
+<!-- Diálogo: usuario -->
+<dialog id="dUsr" class="dlg medio" aria-labelledby="uTit">
+  <form id="fUsr" autocomplete="off">
+    <div class="dlg-cab"><h2 id="uTit">Nuevo usuario</h2><div class="acc"><button type="submit" class="btn">Crear</button><button type="button" class="btn sec" id="uCerrar">Cancelar</button></div></div>
+    <div class="dlg-cuerpo">
+      <div class="g2">
+        <label class="s2">Nombre completo<input id="uNom" required maxlength="80"></label>
+        <label>Usuario (sin espacios)<input id="uUsr" required maxlength="30" autocapitalize="none"></label>
+        <label>Contraseña inicial (mínimo 6)<input id="uClave" required minlength="6"></label>
+        <label>Rol<select id="uRol"></select></label>
+      </div>
+      <div class="msg" id="uMsg" style="text-align:left"></div>
+    </div>
+  </form>
+</dialog>
 
-$('#lista').addEventListener('click', e => { const it = e.target.closest('.item'); if(it) mostrar(it.dataset.k); });
-$('#lista').addEventListener('keydown', e => { const it = e.target.closest('.item'); if(it && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); mostrar(it.dataset.k); } });
-$('#q').addEventListener('input', pintarLista);
-$('#fsuc').addEventListener('change', pintarLista);
-$('#recargar').addEventListener('click', cargar);
-$('#imprimir').addEventListener('click', () => window.print());
-$('#imprimirTodos').addEventListener('click', () => {
-  const l = filtradas(); if(!l.length) return;
-  const actual = selDni;
-  $('#hojas').innerHTML = l.map(p => hojaHTML(p, p.resp[Math.min(selResp[p.key] || 0, p.resp.length - 1)])).join('');
-  setTimeout(() => {
-    window.print();
-    if(actual) mostrar(actual); else $('#hojas').innerHTML = '';
-  }, 300);
-});
+<datalist id="dlProv"></datalist>
+<datalist id="dlProd"></datalist>
+<datalist id="dlUni"></datalist>
+<datalist id="dlPersonal"></datalist>
+<datalist id="dlCargos"></datalist>
+<div id="toast" role="status" aria-live="polite"></div>
 
-cargar();
-</script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
