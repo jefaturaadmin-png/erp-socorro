@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ERP Socorro</title>
+<link rel="icon" href="logo.png">
+<style>
+/* Barra naranja arriba; a la izquierda la lista de personal, a la derecha la hoja A4 tal como se imprime */
+:root{
+  --marca:#fe6e00; --pri:#d95a00; --suave:#fff0e0; --fondo:#f7f5f2;
+  --borde:#e3e0dd; --texto:#2b2f33; --gris:#6b6f73; --rojo:#b3261e; --ambar:#8a5300;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:Arial,Helvetica,sans-serif;background:var(--fondo);color:var(--texto);font-size:14px}
+input,select,button{font:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,.item:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+
+.top{background:var(--marca);color:#fff;display:flex;align-items:center;gap:12px;padding:10px 20px;height:56px}
+.top img{width:36px;height:36px;border-radius:8px;background:#fff}
+.top h1{font-size:18px;margin:0;letter-spacing:.3px}
+.top nav{margin-left:auto;display:flex;gap:6px}
+.top nav a{color:#fff;text-decoration:none;font-size:13px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,.18)}
+.top nav a.act{background:#fff;color:var(--pri);font-weight:bold}
+
+.app{display:grid;grid-template-columns:340px 1fr;height:calc(100% - 56px)}
+.panel{background:#fff;border-right:1px solid var(--borde);display:flex;flex-direction:column;min-height:0}
+.filtros{padding:14px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--borde)}
+.filtros label{font-size:12px;color:var(--gris);display:flex;flex-direction:column;gap:4px}
+.filtros input,.filtros select{width:100%;padding:8px 10px;border:1px solid var(--borde);border-radius:6px;background:#fff}
+.est{font-size:12px;color:var(--gris);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lnk{background:none;border:0;color:var(--pri);cursor:pointer;padding:0;font-size:12px;text-decoration:underline}
+.lista{overflow:auto;flex:1}
+.item{padding:10px 14px;border-bottom:1px solid var(--borde);cursor:pointer;display:flex;flex-direction:column;gap:3px}
+.item:hover{background:#fffaf4}
+.item.sel{background:var(--suave);box-shadow:inset 3px 0 var(--marca)}
+.item b{font-size:13px}
+.item small{color:var(--gris);font-variant-numeric:tabular-nums}
+.chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:#fbe3e1;color:var(--rojo);margin-left:6px;font-weight:normal}
+.vacio{padding:20px 14px;color:var(--gris)}
+
+.visor{overflow:auto;padding:20px;min-width:0}
+.barra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 auto 12px;max-width:210mm}
+.barra .esp{flex:1}
+.btn{background:var(--pri);color:#fff;border:0;border-radius:6px;padding:8px 14px;cursor:pointer}
+.btn.sec{background:#fff;color:var(--pri);border:1px solid var(--pri)}
+.btn:disabled{opacity:.5;cursor:default}
+.aviso{max-width:210mm;margin:0 auto 10px;background:#fff7e6;border:1px solid #f0d49c;color:var(--ambar);padding:8px 12px;border-radius:6px;font-size:13px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.aviso select{padding:4px 6px;border:1px solid #e0c48a;border-radius:4px}
+.error{background:#fdecea;border-color:#f1b5b0;color:var(--rojo)}
+
+/* ---------- Hoja A4 ---------- */
+.hoja{width:210mm;min-height:297mm;margin:0 auto 20px;background:#fff;padding:14mm 16mm;box-shadow:0 1px 4px rgba(0,0,0,.14);color:#000;font-size:10.5pt;line-height:1.35}
+.enc{display:flex;align-items:center;gap:14px;border-bottom:2px solid var(--marca);padding-bottom:8px}
+.enc img{width:20mm;height:20mm}
+.enc .t{flex:1;text-align:center}
+.enc h2{margin:0;font-size:14.5pt;letter-spacing:.4px}
+.enc .sub{font-size:9.5pt;color:#444;margin-top:3px}
+.enc .cod{width:20mm;font-size:8pt;color:#555;text-align:right}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:5px 22px;margin:10px 0 4px}
+.g2 .full{grid-column:1/-1}
+.campo{display:flex;gap:6px;align-items:baseline;min-width:0}
+.campo .k{font-weight:bold;white-space:nowrap}
+.campo .v{flex:1;border-bottom:1px solid #9a9a9a;min-height:1.35em;padding:0 3px;min-width:0}
+.hoja h3{font-size:10.5pt;background:var(--suave);padding:4px 8px;margin:12px 0 7px;border-left:3px solid var(--marca);letter-spacing:.3px}
+.hoja table{width:100%;border-collapse:collapse;font-size:9.5pt}
+.hoja th,.hoja td{border:1px solid #8a8a8a;padding:4px 5px;vertical-align:top}
+.hoja th{background:#f1efed;font-size:9pt}
+.hoja td.c{text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+.const{font-size:9.5pt;text-align:justify;margin:0}
+.obs{border:1px solid #8a8a8a;min-height:16mm;padding:4px 6px;font-size:9.5pt}
+.firmas{display:grid;grid-template-columns:1fr 1fr;gap:18mm;margin-top:20mm}
+.firma .tit{font-weight:bold;text-align:center;margin-bottom:16mm}
+.firma .linea{border-top:1px solid #000;margin-bottom:6px}
+.firma .campo{margin-top:4px}
+[contenteditable]{outline:none;border-radius:2px}
+.hoja [contenteditable]:hover{background:#fff8ef}
+.hoja [contenteditable]:focus{background:var(--suave)}
+.rev{color:var(--rojo);font-weight:bold}
+.rev::after{content:" ⚠";font-size:8pt}
+.dudoso{background:#fff7e6}
+
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;height:auto}
+  .panel{max-height:55vh;border-right:0;border-bottom:1px solid var(--borde)}
+  .visor{padding:12px}
+  .top{padding:10px 14px}
+  .top nav{display:none}
+}
+
+@media print{
+  @page{size:A4;margin:0}
+  html,body{height:auto;background:#fff}
+  .top,.panel,.barra,.aviso{display:none!important}
+  .app{display:block;height:auto}
+  .visor{padding:0;overflow:visible}
+  .hoja{box-shadow:none;margin:0;break-after:page;min-height:auto;height:297mm}
+  .hoja:last-child{break-after:auto}
+  .rev{color:inherit;font-weight:normal}
+  .rev::after{content:""}
+  .dudoso{background:none}
+  .hoja [contenteditable]:hover,.hoja [contenteditable]:focus{background:none}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <img src="logo.png" alt="Farmacia Socorro">
+  <h1>ERP Socorro</h1>
+  <nav aria-label="Módulos"><a href="#" class="act">Cargo de entrega de útiles</a></nav>
+</header>
+
+<div class="app">
+  <aside class="panel">
+    <div class="filtros">
+      <label for="q">Buscar trabajador
+        <input id="q" type="search" placeholder="Nombre o DNI" autocomplete="off">
+      </label>
+      <label for="fsuc">Sucursal
+        <select id="fsuc"><option value="">Todas</option></select>
+      </label>
+      <div class="est"><span id="estado">Cargando datos…</span><button class="lnk" id="recargar" type="button">Actualizar</button></div>
+    </div>
+    <div class="lista" id="lista" role="listbox" aria-label="Personal"></div>
+  </aside>
+
+  <main class="visor">
+    <div class="barra">
+      <button class="btn" id="imprimir" type="button" disabled>Imprimir cargo</button>
+      <button class="btn sec" id="imprimirTodos" type="button" disabled>Imprimir todos (filtro actual)</button>
+      <span class="esp"></span>
+      <span style="font-size:12px;color:var(--gris)">Puedes corregir cualquier dato haciendo clic sobre la hoja.</span>
+    </div>
+    <div id="avisos"></div>
+    <div id="hojas"><div class="hoja" style="display:flex;align-items:center;justify-content:center;color:#888">Selecciona un trabajador de la lista.</div></div>
+  </main>
+</div>
+
+<script>
+// ---------- Configuración ----------
+const SHEET_ID = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
+const EMPRESA = { nombre: 'FS SOCORRO S.A.C.', ruc: '20486562341' };
+// Prendas del formulario: [texto que aparece en la pregunta, nombre en el cargo]
+const PRENDAS = [
+  ['moñera','Moñera'], ['collet','Collet'], ['chompa','Chompa'], ['casaca','Casaca'],
+  ['buzo deportivo','Buzo deportivo'], ['fotocheck','Fotocheck'], ['chaqueta logueada','Chaqueta logueada'],
+  ['mangas','Mangas'], ['chaleco de seguridad','Chaleco de seguridad'], ['guantes de seguridad','Guantes de seguridad'],
+  ['faja de seguridad','Faja de seguridad'], ['fotochek','Fotocheck']
+];
+
+// ---------- Utilidades ----------
+const $ = s => document.querySelector(s);
+const norm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const limpio = s => String(s ?? '').replace(/\s+/g,' ').trim();
+const store = {
+  get(k){ try { return localStorage.getItem('erp_' + k) || ''; } catch(e){ return ''; } },
+  set(k,v){ try { localStorage.setItem('erp_' + k, v); } catch(e){} }
+};
+function hoyTxt(){ const d = new Date(); return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }
+// gviz devuelve fechas como "Date(2026,9,17,14,13,45)" (mes desde 0)
+function gvizFecha(v){
+  const m = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/.exec(String(v||''));
+  if(!m) return null;
+  const d = new Date(+m[1], +m[2], +m[3], +(m[4]||0), +(m[5]||0), +(m[6]||0));
+  d.setFullYear(+m[1]); // años como 0026 no deben convertirse en 1926
+  return d;
+}
+
+// ---------- Estado ----------
+let COLS = [], MAPA = null, PERSONAS = [], selDni = null, selResp = {};
+
+function mapear(cols){
+  const m = { ts:-1, nombre:-1, dni:-1, suc:-1,
+    items: PRENDAS.map(([k,n]) => ({ k:norm(k), n, rec:-1, fecha:-1, estado:-1, obs:-1, talla:-1 })) };
+  let ultimo = null;
+  cols.forEach((c,i) => {
+    const h = norm(c.label);
+    if(h === 'marca temporal'){ m.ts = i; return; }
+    if(h === 'nombre completo'){ m.nombre = i; return; }
+    if(h === 'dni'){ m.dni = i; return; }
+    if(h === 'sucursal'){ m.suc = i; return; }
+    let it = m.items.find(x => h.includes(x.k));
+    if(!it) it = ultimo;            // p. ej. "¿En qué estado se encuentra?" sin nombre de prenda
+    if(!it) return;
+    ultimo = it;
+    const rol = h.includes('talla') ? 'talla'
+      : h.includes('usted recibio') ? 'rec'
+      : h.includes('fecha') ? 'fecha'
+      : h.includes('estado') ? 'estado'
+      : h.includes('observacion') ? 'obs' : null;
+    if(rol && it[rol] === -1) it[rol] = i;
+  });
+  return m;
+}
+
+const celda = (row,i) => (i < 0 || !row.c || !row.c[i]) ? null : row.c[i];
+const txt = (row,i) => { const c = celda(row,i); if(!c || c.v === null || c.v === undefined) return ''; return limpio(c.f ?? c.v); };
+
+function dniDe(row){
+  const c = celda(row, MAPA.dni); if(!c || c.v === null) return '';
+  return typeof c.v === 'number' ? String(Math.round(c.v)).padStart(8,'0') : limpio(c.v).padStart(8,'0');
+}
+
+function fechaDudosa(row,i){
+  const c = celda(row,i); if(!c || !c.v) return false;
+  const d = gvizFecha(c.v); if(!d) return false;
+  const y = d.getFullYear();
+  return y < 2020 || d > new Date();
+}
+
+function prendasDe(row){
+  return MAPA.items.map(it => {
+    const rec = norm(txt(row,it.rec));
+    const fecha = txt(row,it.fecha), est = txt(row,it.estado), obs = txt(row,it.obs), talla = txt(row,it.talla);
+    const si = rec === 'si';
+    const dudoso = !rec && !!(fecha || est);   // respondió fecha/estado sin marcar "Sí"
+    if(!si && !dudoso) return null;
+    return { n:it.n, fecha, fechaRev:fechaDudosa(row,it.fecha), est, obs, talla, dudoso };
+  }).filter(Boolean);
+}
+
+// ---------- Carga ----------
+async function cargar(){
+  $('#estado').textContent = 'Cargando datos…';
+  try{
+    const url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:json&headers=1&t=' + Date.now();
+    const r = await fetch(url);
+    const t = await r.text();
+    const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1));
+    if(j.status !== 'ok') throw new Error('respuesta de Google: ' + (j.errors?.[0]?.detailed_message || j.status));
+    COLS = j.table.cols; MAPA = mapear(COLS);
+    const grupos = new Map();
+    j.table.rows.forEach(row => {
+      const dni = dniDe(row); const nombre = txt(row,MAPA.nombre);
+      if(!dni && !nombre) return;
+      const ts = gvizFecha(celda(row,MAPA.ts)?.v) || new Date(0);
+      const key = dni || nombre;
+      if(!grupos.has(key)) grupos.set(key, []);
+      grupos.get(key).push({ row, ts, tsTxt: txt(row,MAPA.ts), dni, nombre, suc: txt(row,MAPA.suc) });
+    });
+    PERSONAS = [...grupos.entries()].map(([key, resp]) => {
+      resp.sort((a,b) => b.ts - a.ts);
+      return { key, resp, nombre: resp[0].nombre, dni: resp[0].dni, suc: resp[0].suc };
+    }).sort((a,b) => a.nombre.localeCompare(b.nombre, 'es'));
+    const sucs = [...new Set(PERSONAS.map(p => p.suc).filter(Boolean))].sort((a,b) => a.localeCompare(b,'es'));
+    const fs = $('#fsuc'), prev = fs.value;
+    fs.innerHTML = '<option value="">Todas</option>' + sucs.map(s => '<option>' + esc(s) + '</option>').join('');
+    fs.value = sucs.includes(prev) ? prev : '';
+    $('#estado').textContent = PERSONAS.length + ' trabajadores · ' + j.table.rows.length + ' respuestas';
+    pintarLista();
+    if(selDni && PERSONAS.some(p => p.key === selDni)) mostrar(selDni);
+  }catch(e){
+    $('#estado').textContent = 'No se pudo cargar';
+    $('#avisos').innerHTML = '<div class="aviso error">No se pudieron leer las respuestas del Google Sheets (' + esc(e.message) + '). Revisa que la hoja siga compartida como "Cualquier persona con el enlace" y pulsa Actualizar.</div>';
+  }
+}
+
+function filtradas(){
+  const q = norm($('#q').value), s = $('#fsuc').value;
+  return PERSONAS.filter(p => (!s || p.suc === s) && (!q || norm(p.nombre).includes(q) || p.dni.includes(q)));
+}
+
+function pintarLista(){
+  const l = filtradas();
+  $('#lista').innerHTML = l.length ? l.map(p =>
+    '<div class="item' + (p.key === selDni ? ' sel' : '') + '" role="option" tabindex="0" data-k="' + esc(p.key) + '">' +
+      '<b>' + esc(p.nombre) + (p.resp.length > 1 ? '<span class="chip">' + p.resp.length + ' respuestas</span>' : '') + '</b>' +
+      '<small>DNI ' + esc(p.dni) + ' · ' + esc(p.suc) + '</small></div>').join('')
+    : '<div class="vacio">No hay trabajadores con ese filtro.</div>';
+  $('#imprimirTodos').disabled = !l.length;
+  $('#imprimirTodos').textContent = 'Imprimir todos (' + l.length + ')';
+}
+
+// ---------- Hoja ----------
+function campo(k, v, opts = {}){
+  return '<div class="campo' + (opts.full ? ' full' : '') + '"><span class="k">' + k + ':</span><span class="v" contenteditable="true"' +
+    (opts.id ? ' data-guardar="' + opts.id + '"' : '') + '>' + esc(v) + '</span></div>';
+}
+
+function hojaHTML(p, r){
+  const prendas = prendasDe(r.row);
+  const nombre = r.nombre.toUpperCase();
+  const filas = prendas.length ? prendas.map((x,i) => {
+    const estObs = [x.est, x.obs].filter(Boolean).map(esc).join(' – ');
+    return '<tr' + (x.dudoso ? ' class="dudoso" title="En el formulario no marcó que la recibió, pero llenó fecha o estado"' : '') + '>' +
+      '<td class="c">' + (i+1) + '</td>' +
+      '<td contenteditable="true">' + esc(x.n) + '</td>' +
+      '<td class="c" contenteditable="true">' + esc(x.talla) + '</td>' +
+      '<td class="c" contenteditable="true">1</td>' +
+      '<td class="c" contenteditable="true">UND</td>' +
+      '<td class="c' + (x.fechaRev ? ' rev' : '') + '" contenteditable="true">' + esc(x.fecha) + '</td>' +
+      '<td contenteditable="true">' + estObs + '</td></tr>';
+  }).join('') : '<tr><td colspan="7" style="text-align:center;color:#666">El trabajador indicó que no recibió ninguna prenda.</td></tr>';
+  const extra = Math.max(0, 5 - prendas.length);
+  const vacias = Array.from({length: extra}, (_,i) => '<tr><td class="c">' + (prendas.length + i + 1) + '</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>').join('');
+
+  return '<section class="hoja">' +
+    '<div class="enc"><img src="logo.png" alt=""><div class="t"><h2>CARGO DE ENTREGA DE ÚTILES DE TRABAJO</h2>' +
+      '<div class="sub">' + esc(EMPRESA.nombre) + ' · RUC ' + esc(EMPRESA.ruc) + '</div></div>' +
+      '<div class="cod">Resp. ' + esc(r.tsTxt.split(' ')[0]) + '</div></div>' +
+    '<div class="g2">' +
+      campo('Empresa', EMPRESA.nombre) + campo('RUC', EMPRESA.ruc) +
+      campo('Área', r.suc) + campo('Fecha de entrega', hoyTxt()) +
+    '</div>' +
+    '<h3>DATOS DEL TRABAJADOR</h3>' +
+    '<div class="g2">' +
+      campo('Nombres y apellidos', nombre, {full:true}) +
+      campo('DNI', r.dni) + campo('Cargo', '') +
+      campo('Área de trabajo', r.suc, {full:true}) +
+    '</div>' +
+    '<h3>DETALLE DE LOS ÚTILES ENTREGADOS</h3>' +
+    '<table><thead><tr><th style="width:7mm">N.º</th><th>Descripción del útil</th><th style="width:12mm">Talla</th><th style="width:12mm">Cant.</th><th style="width:13mm">Unidad</th><th style="width:22mm">Fecha de recepción</th><th>Estado / Observaciones</th></tr></thead>' +
+    '<tbody>' + filas + vacias + '</tbody></table>' +
+    '<h3>CONSTANCIA DE RECEPCIÓN</h3>' +
+    '<p class="const">Declaro haber recibido los útiles de trabajo detallados en el presente documento, en las cantidades y condiciones indicadas, para el desarrollo de mis funciones laborales.</p>' +
+    '<h3>OBSERVACIONES</h3><div class="obs" contenteditable="true"></div>' +
+    '<div class="firmas">' +
+      '<div class="firma"><div class="tit">ENTREGUÉ CONFORME</div><div class="linea"></div>' +
+        campo('Firma', '') .replace('class="v" contenteditable="true"', 'class="v"') +
+        campo('Nombre', store.get('entrega_nombre'), {id:'entrega_nombre'}) +
+        campo('Cargo', store.get('entrega_cargo'), {id:'entrega_cargo'}) +
+        campo('Fecha', hoyTxt()) + '</div>' +
+      '<div class="firma"><div class="tit">RECIBÍ CONFORME</div><div class="linea"></div>' +
+        campo('Firma', '').replace('class="v" contenteditable="true"', 'class="v"') +
+        campo('Nombre', nombre) + campo('DNI', r.dni) + campo('Fecha', hoyTxt()) + '</div>' +
+    '</div></section>';
+}
+
+function mostrar(key){
+  selDni = key;
+  const p = PERSONAS.find(x => x.key === key); if(!p) return;
+  const idx = Math.min(selResp[key] || 0, p.resp.length - 1);
+  const r = p.resp[idx];
+  document.querySelectorAll('.item').forEach(el => el.classList.toggle('sel', el.dataset.k === key));
+  $('#hojas').innerHTML = hojaHTML(p, r);
+  const prendas = prendasDe(r.row);
+  const av = [];
+  if(p.resp.length > 1){
+    av.push('<div class="aviso">Este trabajador respondió ' + p.resp.length + ' veces. Usando la respuesta del ' +
+      '<select id="selResp" aria-label="Respuesta a usar">' + p.resp.map((x,i) => '<option value="' + i + '"' + (i === idx ? ' selected' : '') + '>' + esc(x.tsTxt) + (i === 0 ? ' (más reciente)' : '') + ' · ' + esc(x.suc) + '</option>').join('') + '</select></div>');
+  }
+  if(prendas.some(x => x.fechaRev)) av.push('<div class="aviso">Hay fechas de recepción imposibles o futuras (en rojo). Corrígelas haciendo clic sobre ellas antes de imprimir.</div>');
+  if(prendas.some(x => x.dudoso)) av.push('<div class="aviso">Algunas prendas (sombreadas) tienen fecha o estado, pero el trabajador no marcó que las recibió. Revísalas o bórralas antes de imprimir.</div>');
+  $('#avisos').innerHTML = av.join('');
+  const sr = $('#selResp'); if(sr) sr.onchange = () => { selResp[key] = +sr.value; mostrar(key); };
+  $('#imprimir').disabled = false;
+}
+
+// Guardar nombre y cargo de quien entrega para no escribirlos cada vez
+document.addEventListener('input', e => {
+  const k = e.target.dataset && e.target.dataset.guardar;
+  if(k) store.set(k, e.target.textContent.trim());
+});
+
+$('#lista').addEventListener('click', e => { const it = e.target.closest('.item'); if(it) mostrar(it.dataset.k); });
+$('#lista').addEventListener('keydown', e => { const it = e.target.closest('.item'); if(it && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); mostrar(it.dataset.k); } });
+$('#q').addEventListener('input', pintarLista);
+$('#fsuc').addEventListener('change', pintarLista);
+$('#recargar').addEventListener('click', cargar);
+$('#imprimir').addEventListener('click', () => window.print());
+$('#imprimirTodos').addEventListener('click', () => {
+  const l = filtradas(); if(!l.length) return;
+  const actual = selDni;
+  $('#hojas').innerHTML = l.map(p => hojaHTML(p, p.resp[Math.min(selResp[p.key] || 0, p.resp.length - 1)])).join('');
+  setTimeout(() => {
+    window.print();
+    if(actual) mostrar(actual); else $('#hojas').innerHTML = '';
+  }, 300);
+});
+
+cargar();
+</script>
+</body>
+</html>
