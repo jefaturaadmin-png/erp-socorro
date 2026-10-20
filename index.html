@@ -131,7 +131,7 @@ table.lineas td.ancho{min-width:240px}
 table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor:pointer;padding:0 6px}
 .marca-prod{font-size:11px;display:block;margin-top:2px}
 .marca-prod.ok{color:var(--ok)}.marca-prod.nuevo{color:var(--ambar)}
-.totales{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;background:var(--suave2);border:1px solid var(--borde);border-radius:8px;padding:10px 12px}
+.totales{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;background:var(--suave2);border:1px solid var(--borde);border-radius:8px;padding:10px 12px}
 .totales div{font-size:12px;color:var(--gris)}
 .totales b{display:block;font-size:16px;color:var(--texto);font-variant-numeric:tabular-nums}
 .aviso{background:var(--ambar-f);border:1px solid #f0d49c;color:var(--ambar);padding:8px 12px;border-radius:6px;font-size:13px}
@@ -353,7 +353,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <dialog id="dComp" class="dlg grande" aria-labelledby="cTit">
   <form id="fComp" novalidate>
     <div class="dlg-cab"><h2 id="cTit">Nuevo ingreso</h2>
-      <div class="acc"><button type="button" class="btn sec" id="cIA">Leer con IA</button><button type="submit" class="btn" id="cGuardar">Guardar</button><button type="button" class="btn sec" id="cCerrar">Cerrar</button></div></div>
+      <div class="acc"><button type="button" class="btn sec" id="cLeer" title="Lee el texto del PDF o de la foto, gratis">Leer comprobante</button><button type="button" class="btn sec" id="cIA">Leer con IA</button><button type="submit" class="btn" id="cGuardar">Guardar</button><button type="button" class="btn sec" id="cCerrar">Cerrar</button></div></div>
     <div class="dlg-cuerpo">
       <div class="aviso" id="cMsg" hidden></div>
       <div class="comp">
@@ -380,6 +380,8 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
             <label>¿Es contable?<select id="cCont"><option>SI</option><option>NO</option></select></label>
             <label>¿Detracción?<select id="cDet"><option>NO</option><option>SI</option></select></label>
             <label>% detracción<input id="cDetPct" type="number" min="0" max="100" step="0.01"></label>
+            <label>¿Retención 4ta cat.?<select id="cRet"><option>NO</option><option>SI</option></select></label>
+            <label>% retención<input id="cRetPct" type="number" min="0" max="100" step="0.01"></label>
             <label class="s2">Empresa<select id="cEmpresa"></select></label>
             <label>Destino<select id="cDestino"></select></label>
             <label>N.º solicitud<input id="cSol" maxlength="20"></label>
@@ -394,6 +396,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
             <div>IGV<b id="tIgv">0.00</b></div>
             <div>Total factura<b id="tTot">0.00</b></div>
             <div>Detracción<b id="tDet">0.00</b></div>
+            <div>Retención IR<b id="tRet">0.00</b></div>
             <div>Total a pagar<b id="tPagar">0.00</b></div>
           </div>
           <div id="cAprob" class="nota"></div>

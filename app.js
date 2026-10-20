@@ -57,8 +57,8 @@ const DEF_LISTAS = {
   cargos: ['QUÍMICO FARMACÉUTICO', 'TÉCNICO EN FARMACIA', 'CAJERO(A)', 'ALMACENERO', 'ASISTENTE ADMINISTRATIVO', 'ASISTENTE DE LOGÍSTICA', 'JEFE DE LOGÍSTICA', 'CONTADOR(A)', 'GERENTE']
 };
 const PROMPT_IA = `Eres un asistente contable en Perú. Lee este comprobante de pago (factura, boleta, recibo por honorarios, nota de crédito, etc.) y devuelve SOLO un objeto JSON con esta forma exacta:
-{"tipo":"FACTURA|BOLETA|RECIBO POR HONORARIOS|NOTA DE CREDITO|NOTA DE DEBITO|TICKET|OTRO","serie":"F001","numero":"20538","fechaEmision":"YYYY-MM-DD","fechaVencimiento":"YYYY-MM-DD o null","moneda":"PEN o USD","proveedorRuc":"RUC del emisor","proveedorRazon":"razón social del emisor","clienteRuc":"RUC del cliente o null","clienteRazon":"razón social del cliente o null","condicionPago":"CONTADO o 'N DIAS CREDITO' o null","items":[{"codigo":null,"descripcion":"","unidad":"UND","cantidad":1,"valorUnitario":0,"subtotal":0,"lote":null,"vencimiento":"YYYY-MM-DD o null"}],"subtotal":0,"igv":0,"total":0,"detraccion":false,"porcentajeDetraccion":0}
-Reglas: valorUnitario y subtotal de cada ítem van SIN IGV; si el comprobante solo muestra precios con IGV, divídelos entre 1.18. Números sin separador de miles y con punto decimal. El emisor (proveedor) es quien emite el comprobante, no el cliente. Si un dato no aparece, usa null. No inventes datos.`;
+{"tipo":"FACTURA|BOLETA|RECIBO POR HONORARIOS|NOTA DE CREDITO|NOTA DE DEBITO|TICKET|OTRO","serie":"F001","numero":"20538","fechaEmision":"YYYY-MM-DD","fechaVencimiento":"YYYY-MM-DD o null","moneda":"PEN o USD","proveedorRuc":"RUC del emisor","proveedorRazon":"razón social del emisor","clienteRuc":"RUC del cliente o null","clienteRazon":"razón social del cliente o null","condicionPago":"CONTADO o 'N DIAS CREDITO' o null","items":[{"codigo":null,"descripcion":"","unidad":"UND","cantidad":1,"valorUnitario":0,"subtotal":0,"lote":null,"vencimiento":"YYYY-MM-DD o null"}],"subtotal":0,"igv":0,"total":0,"detraccion":false,"porcentajeDetraccion":0,"retencion":0,"porcentajeRetencion":0}
+Reglas: valorUnitario y subtotal de cada ítem van SIN IGV; si el comprobante solo muestra precios con IGV, divídelos entre 1.18. Números sin separador de miles y con punto decimal. El emisor (proveedor) es quien emite el comprobante, no el cliente. En recibos por honorarios: total = total por honorarios, retencion = monto de la retención de renta (4ta categoría) y el ítem es el concepto. Si un dato no aparece, usa null. No inventes datos.`;
 
 /* ================= Utilidades ================= */
 const $ = id => document.getElementById(id);
@@ -305,7 +305,7 @@ function pintarComps(clase) {
     if (!anul && pendiente && puede('aprobar')) acc.push(`<button class="btn chico" data-a="aprobar" data-id="${esc(c.id)}">Aprobar</button><button class="btn peligro chico" data-a="rechazar" data-id="${esc(c.id)}">Rechazar</button>`);
     if (!anul && puede('comprobantes')) acc.push(`<button class="btn peligro chico" data-a="anular" data-id="${esc(c.id)}">Anular</button>`);
     const det = serv ? `${esc(c.gasto || '')}<br><small class="nota">${esc(c.centro || '')}</small>` : `${(c.lineas || []).length} ítem(s)<br><small class="nota">${esc((c.lineas || []).slice(0, 2).map(x => x.desc).join(', '))}${(c.lineas || []).length > 2 ? '…' : ''}</small>`;
-    return `<tr class="${anul ? 'anulado' : ''}"><td>${fmtF(c.fechaEmision)}</td><td>${esc(c.tipo)}<br><b>${esc(c.serie)}-${esc(c.numero)}</b></td><td>${esc(c.razon)}<br><small class="nota">${esc(c.ruc)}</small></td><td>${esc(c.empresa)}</td><td>${det}</td><td class="num">${mon(c.moneda)} ${n2(c.total)}${c.detMonto ? `<br><small class="nota">Detr. ${n2(c.detMonto)}</small>` : ''}</td><td>${fmtF(c.fechaVence)}</td><td>${pill(c)}${c.aprobacion?.usuario ? `<br><small class="nota">${esc(c.aprobacion.usuario)}</small>` : ''}</td><td><div class="acciones">${acc.join('')}</div></td></tr>`;
+    return `<tr class="${anul ? 'anulado' : ''}"><td>${fmtF(c.fechaEmision)}</td><td>${esc(c.tipo)}<br><b>${esc(c.serie)}-${esc(c.numero)}</b></td><td>${esc(c.razon)}<br><small class="nota">${esc(c.ruc)}</small></td><td>${esc(c.empresa)}</td><td>${det}</td><td class="num">${mon(c.moneda)} ${n2(c.total)}${c.detMonto ? `<br><small class="nota">Detr. ${n2(c.detMonto)}</small>` : ''}${c.retMonto ? `<br><small class="nota">Ret. ${n2(c.retMonto)}</small>` : ''}</td><td>${fmtF(c.fechaVence)}</td><td>${pill(c)}${c.aprobacion?.usuario ? `<br><small class="nota">${esc(c.aprobacion.usuario)}</small>` : ''}</td><td><div class="acciones">${acc.join('')}</div></td></tr>`;
   }).join('') : `<tr><td colspan="9" class="vacio">No hay comprobantes con este filtro.${puede('comprobantes') ? ' Usa “+ Nuevo ingreso” para registrar el primero.' : ''}</td></tr>`;
 }
 async function accionComp(clase, e) {
@@ -334,8 +334,8 @@ async function accionComp(clase, e) {
   }
 }
 function exportarComps(clase) {
-  const l = filtrarComps(clase), filas = [['Fecha emisión', 'Tipo', 'Serie', 'Número', 'RUC', 'Proveedor', 'Empresa', 'Condición', 'Vencimiento', 'Forma de pago', 'Tipo de gasto', 'Centro de costos', 'Destino', 'Moneda', 'Ítem', 'Producto / concepto', 'Código', 'Unidad', 'Cantidad', 'P. unit sin IGV', 'Subtotal', 'IGV', 'Total ítem', 'Total comprobante', 'Detracción', 'Total a pagar', 'Aprobación', 'Estado', 'Registró', 'N.º solicitud', 'Anotaciones']];
-  l.forEach(c => (c.lineas || []).forEach((x, i) => filas.push([fmtF(c.fechaEmision), c.tipo, c.serie, c.numero, c.ruc, c.razon, c.empresa, c.condicion, fmtF(c.fechaVence), c.forma, c.gasto, c.centro, c.destino, c.moneda, i + 1, x.desc, x.codigo || '', x.unidad || '', String(x.cant).replace('.', ','), numCSV(x.vu), numCSV(x.sub), numCSV(x.igv), numCSV(x.tot), i === 0 ? numCSV(c.total) : '', i === 0 ? numCSV(c.detMonto) : '', i === 0 ? numCSV(c.totalPagar) : '', c.aprobacion?.estado || '', c.estado, c.creadoPor?.nombre || '', c.solicitud || '', c.notas || ''])));
+  const l = filtrarComps(clase), filas = [['Fecha emisión', 'Tipo', 'Serie', 'Número', 'RUC', 'Proveedor', 'Empresa', 'Condición', 'Vencimiento', 'Forma de pago', 'Tipo de gasto', 'Centro de costos', 'Destino', 'Moneda', 'Ítem', 'Producto / concepto', 'Código', 'Unidad', 'Cantidad', 'P. unit sin IGV', 'Subtotal', 'IGV', 'Total ítem', 'Total comprobante', 'Detracción', 'Retención IR', 'Total a pagar', 'Aprobación', 'Estado', 'Registró', 'N.º solicitud', 'Anotaciones']];
+  l.forEach(c => (c.lineas || []).forEach((x, i) => filas.push([fmtF(c.fechaEmision), c.tipo, c.serie, c.numero, c.ruc, c.razon, c.empresa, c.condicion, fmtF(c.fechaVence), c.forma, c.gasto, c.centro, c.destino, c.moneda, i + 1, x.desc, x.codigo || '', x.unidad || '', String(x.cant).replace('.', ','), numCSV(x.vu), numCSV(x.sub), numCSV(x.igv), numCSV(x.tot), i === 0 ? numCSV(c.total) : '', i === 0 ? numCSV(c.detMonto) : '', i === 0 ? numCSV(c.retMonto) : '', i === 0 ? numCSV(c.totalPagar) : '', c.aprobacion?.estado || '', c.estado, c.creadoPor?.nombre || '', c.solicitud || '', c.notas || ''])));
   descargarCSV(`${clase === 'SERVICIO' ? 'servicios' : 'compras'}_${EST[clase].mes || 'ultimos'}.csv`, filas);
 }
 
@@ -349,7 +349,7 @@ function buscarProd(txt) {
   return null;
 }
 const CAMPOS_BLOQ_EDIT = ['cTipo', 'cSerie', 'cNum', 'cRuc'];
-const CAMPOS = ['cTipo', 'cSerie', 'cNum', 'cFecha', 'cRuc', 'cRazon', 'cCond', 'cVence', 'cForma', 'cMoneda', 'cGasto', 'cCentro', 'cIgv', 'cCont', 'cDet', 'cDetPct', 'cEmpresa', 'cDestino', 'cSol', 'cNotas'];
+const CAMPOS = ['cTipo', 'cSerie', 'cNum', 'cFecha', 'cRuc', 'cRazon', 'cCond', 'cVence', 'cForma', 'cMoneda', 'cGasto', 'cCentro', 'cIgv', 'cCont', 'cDet', 'cDetPct', 'cRet', 'cRetPct', 'cEmpresa', 'cDestino', 'cSol', 'cNotas'];
 
 async function abrirEditor(clase, c, modo) {
   ED = { clase, modo, id: c?.id || null, archivo: null, adjuntoId: c?.adjuntoId || null, lineas: c ? structuredClone(c.lineas || []) : [lineaVacia()], iaTotal: null };
@@ -365,10 +365,12 @@ async function abrirEditor(clase, c, modo) {
   $('cSerie').value = c?.serie || ''; $('cNum').value = c?.numero || ''; $('cFecha').value = c?.fechaEmision || hoyISO();
   $('cRuc').value = c?.ruc || ''; $('cRazon').value = c?.razon || ''; $('cVence').value = c?.fechaVence || '';
   $('cMoneda').value = c?.moneda || 'PEN'; $('cIgv').value = c?.afectoIgv || 'SI'; $('cCont').value = c?.contable || 'SI';
-  $('cDet').value = c?.detraccion || 'NO'; $('cDetPct').value = c?.detPct ?? 0; $('cSol').value = c?.solicitud || ''; $('cNotas').value = c?.notas || '';
+  $('cDet').value = c?.detraccion || 'NO'; $('cDetPct').value = c?.detPct ?? 0;
+  $('cRet').value = c?.retencion || 'NO'; $('cRetPct').value = c?.retPct ?? 8; $('cSol').value = c?.solicitud || ''; $('cNotas').value = c?.notas || '';
   if (!c) calcVence();
   CAMPOS.forEach(id => $(id).disabled = ro || (modo === 'editar' && CAMPOS_BLOQ_EDIT.includes(id)));
-  ['cIA', 'cGuardar', 'cAddLin', 'cCambiar'].forEach(id => $(id).hidden = ro);
+  ['cLeer', 'cGuardar', 'cAddLin', 'cCambiar'].forEach(id => $(id).hidden = ro);
+  $('cIA').hidden = ro || !IA?.clave;
   $('cMsg').hidden = true;
   const ap = c?.aprobacion;
   $('cAprob').innerHTML = c ? `Registrado por <b>${esc(c.creadoPor?.nombre || '')}</b> el ${new Date(c.creadoMs).toLocaleString('es-PE')}. Aprobación: ${pill(c)}${ap?.usuario ? ` por ${esc(ap.usuario)} (${fmtF(ap.fecha)})` : ''}${ap?.motivo ? ` — ${esc(ap.motivo)}` : ''}${c.estado === 'ANULADO' ? ` · Anulado por ${esc(c.anuladoPor || '')}` : ''}` : '';
@@ -446,7 +448,10 @@ function calcVence() {
 }
 $('cCond').addEventListener('change', calcVence);
 $('cFecha').addEventListener('change', calcVence);
-['cIgv', 'cDet', 'cDetPct'].forEach(id => $(id).addEventListener('input', () => pintarLineas()));
+['cIgv', 'cDet', 'cDetPct', 'cRet', 'cRetPct'].forEach(id => $(id).addEventListener('input', () => pintarLineas()));
+$('cTipo').addEventListener('change', () => {
+  if ($('cTipo').value === 'RECIBO POR HONORARIOS') { $('cIgv').value = 'NO'; if (!num($('cRetPct').value)) $('cRetPct').value = 8; pintarLineas(); if (totales().total > 1500) { $('cRet').value = 'SI'; pintarLineas(); } }
+});
 $('cRuc').addEventListener('change', () => { const p = PROVEEDORES.get(limpio($('cRuc').value)); if (p && !limpio($('cRazon').value)) $('cRazon').value = p.razon; });
 
 function calcLinea(l) { const sub = r2(num(l.cant) * num(l.vu)); const igv = $('cIgv').value === 'SI' ? r2(sub * IGV) : 0; return { sub, igv, tot: r2(sub + igv) }; }
@@ -455,8 +460,9 @@ function totales() {
   ED.lineas.forEach(l => { const c = calcLinea(l); s += c.sub; g += c.igv; });
   s = r2(s); g = r2(g); const t = r2(s + g);
   const det = $('cDet').value === 'SI' ? Math.round(t * num($('cDetPct').value) / 100) : 0;
-  const r = { subtotal: s, igv: g, total: t, detMonto: det, totalPagar: r2(t - det) };
-  $('tSub').textContent = n2(s); $('tIgv').textContent = n2(g); $('tTot').textContent = n2(t); $('tDet').textContent = n2(det); $('tPagar').textContent = n2(r.totalPagar);
+  const ret = $('cRet').value === 'SI' ? r2(t * num($('cRetPct').value) / 100) : 0;
+  const r = { subtotal: s, igv: g, total: t, detMonto: det, retMonto: ret, totalPagar: r2(t - det - ret) };
+  $('tSub').textContent = n2(s); $('tIgv').textContent = n2(g); $('tTot').textContent = n2(t); $('tDet').textContent = n2(det); $('tRet').textContent = n2(ret); $('tPagar').textContent = n2(r.totalPagar);
   return r;
 }
 function marcaProd(l) {
@@ -544,6 +550,11 @@ function aplicarIA(d) {
   const igv = num(d.igv), total = num(d.total);
   $('cIgv').value = igv === 0 && total > 0 ? 'NO' : 'SI';
   if (d.detraccion) { $('cDet').value = 'SI'; $('cDetPct').value = num(d.porcentajeDetraccion) || 12; }
+  const ret = num(d.retencion);
+  if (tipo === 'RECIBO POR HONORARIOS') $('cIgv').value = 'NO';
+  if (ret > 0 && total > 0) { $('cRet').value = 'SI'; $('cRetPct').value = num(d.porcentajeRetencion) || Math.round(ret / total * 1000) / 10; }
+  else if (tipo === 'RECIBO POR HONORARIOS' && total > 1500) { $('cRet').value = 'SI'; $('cRetPct').value = 8; }
+  else $('cRet').value = 'NO';
   const items = Array.isArray(d.items) ? d.items : [];
   ED.lineas = items.map(it => {
     const cant = num(it.cantidad) || 1;
@@ -554,9 +565,112 @@ function aplicarIA(d) {
   }).filter(l => l.desc);
   if (!ED.lineas.length) ED.lineas = [{ ...lineaVacia(), desc: 'SEGÚN COMPROBANTE', vu: num(d.subtotal) || r2(total / (igv ? 1 + IGV : 1)) }];
   ED.iaTotal = total || null;
-  msgComp('Datos leídos con IA. <b>Revísalos con la imagen antes de guardar</b>; completa tipo de gasto, centro de costos y destino.', 'ok');
+  msgComp((d._fuente || 'Datos leídos con IA.') + ' <b>Revísalos con la imagen antes de guardar</b>; completa tipo de gasto, centro de costos y destino.', 'ok');
   pintarLineas();
 }
+
+/* ---------- Lectura gratuita: texto del PDF (pdf.js) u OCR de la foto (Tesseract) ---------- */
+const scripts = {};
+function cargarScript(src) {
+  if (!scripts[src]) scripts[src] = new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => { delete scripts[src]; no(new Error('No se pudo cargar el lector. Revisa tu internet.')); }; document.head.appendChild(s); });
+  return scripts[src];
+}
+async function pdfjs() {
+  await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  return window.pdfjsLib;
+}
+const bytesDe = a => { const b = atob(a.d), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+async function textoPDF(a) {
+  const lib = await pdfjs(), pdf = await lib.getDocument({ data: bytesDe(a) }).promise;
+  let lineas = [];
+  for (let n = 1; n <= Math.min(pdf.numPages, 2); n++) {
+    const pg = await pdf.getPage(n), tc = await pg.getTextContent(), filas = [];
+    tc.items.forEach(it => { if (!it.str.trim()) return; const y = Math.round(it.transform[5]); let f = filas.find(r => Math.abs(r.y - y) <= 3); if (!f) filas.push(f = { y, partes: [] }); f.partes.push({ x: it.transform[4], t: it.str }); });
+    filas.sort((p, q) => q.y - p.y).forEach(f => lineas.push(f.partes.sort((p, q) => p.x - q.x).map(x => x.t).join(' ').replace(/\s+/g, ' ').trim()));
+  }
+  return lineas.join('\n');
+}
+async function imagenDePDF(a) {
+  const lib = await pdfjs(), pdf = await lib.getDocument({ data: bytesDe(a) }).promise, pg = await pdf.getPage(1);
+  const vp = pg.getViewport({ scale: 2.2 }), cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
+  await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+  return cv;
+}
+async function ocr(fuente, avance) {
+  await cargarScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+  const w = await window.Tesseract.createWorker('spa', 1, { logger: m => { if (m.status === 'recognizing text') avance(Math.round(m.progress * 100)); } });
+  try { const { data } = await w.recognize(fuente); return data.text; } finally { await w.terminate(); }
+}
+const MESES_N = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
+const iso = (d, m, y) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+function montoTras(txt, etiqueta) {
+  const m = new RegExp(etiqueta + '[^\\d\\n]{0,40}?(\\d{1,3}(?:[,\\s]\\d{3})*(?:\\.\\d{1,2})|\\d+(?:\\.\\d{1,2})?)', 'i').exec(txt);
+  return m ? num(m[1].replace(/\s/g, '')) : 0;
+}
+function parsearComprobante(txt) {
+  const t = txt.replace(/[|]/g, ' ').replace(/[ \t]+/g, ' '), n = norm(t), lineas = t.split('\n').map(limpio).filter(Boolean);
+  const d = { items: [], _fuente: '' };
+  d.tipo = /honorario/.test(n) ? 'RECIBO POR HONORARIOS' : /nota de credito/.test(n) ? 'NOTA DE CREDITO' : /boleta/.test(n) ? 'BOLETA' : /factura/.test(n) ? 'FACTURA' : 'OTRO';
+  const sn = /\b([EFB][A-Z0-9]{2,3})\s*[-–N°º.:]*\s*[-–]\s*0*(\d{1,8})\b/.exec(t) || /\bnro\.?\s*:?\s*([A-Z]\d{3})\s*[-–]\s*0*(\d{1,8})/i.exec(t);
+  if (sn) { d.serie = sn[1].toUpperCase(); d.numero = sn[2]; }
+  const rucs = [...t.matchAll(/\b(1[05]\d{9}|2\d{10})\b/g)].map(m => m[1]);
+  const rucCli = /identificad[oa]\s+con\s+(?:el\s+)?R\.?U\.?C\.?[^\d]{0,15}(\d{11})/i.exec(t)?.[1] || /(?:se[ñn]or(?:es)?|cliente|adquiriente)[^\n]{0,80}?(\d{11})/i.exec(t)?.[1];
+  d.clienteRuc = rucCli || (rucs.find(r => LISTAS.empresas.some(e => e.ruc === r)) || null);
+  d.proveedorRuc = rucs.find(r => r !== d.clienteRuc && !LISTAS.empresas.some(e => e.ruc === r)) || null;
+  const recibi = /recib[ií]\s+de\s*:?\s*([^\n]+)/i.exec(t); if (recibi) d.clienteRazon = limpio(recibi[1]);
+  // Nombre del emisor: proveedor ya conocido, o la línea en mayúsculas más cercana a su RUC
+  if (d.proveedorRuc && PROVEEDORES.get(d.proveedorRuc)) d.proveedorRazon = PROVEEDORES.get(d.proveedorRuc).razon;
+  else if (d.proveedorRuc) {
+    const i = lineas.findIndex(l => l.includes(d.proveedorRuc));
+    const malo = /RECIBO|HONORARIO|ELECTR|R\.?U\.?C|NRO|N°|DIRECC|AV\.|JR\.|CALLE|TELF|TEL[EÉ]F|FECHA|FACTURA|BOLETA|PER[UÚ]|HUANCAYO|LIMA|JUN[IÍ]N|DISTRITO|PROVINCIA/i;
+    const ok = l => l && l.length >= 6 && !/\d{3}/.test(l) && !malo.test(l) && l.replace(/[^A-ZÁÉÍÓÚÑ ]/g, '').length >= l.length * 0.7;
+    const cand = [lineas[i - 1], lineas[i + 1], lineas[i - 2], lineas[i + 2], lineas[i - 3]].find(ok) || (ok(lineas[0]) ? lineas[0] : '');
+    const enLinea = i >= 0 ? limpio(lineas[i].replace(/R\.?U\.?C\.?\s*:?\s*\d{11}/i, '')) : '';
+    d.proveedorRazon = cand || (ok(enLinea) ? enLinea : '');
+  }
+  const f1 = /fecha\s+de\s+emisi[oó]n\s*:?\s*(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/i.exec(t) || /\b(\d{1,2})\/(\d{1,2})\/(20\d{2})\b/.exec(t);
+  const f2 = /(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+del?\s+(\d{4})/i.exec(t);
+  if (f1) d.fechaEmision = iso(f1[1], f1[2], f1[3]); else if (f2) d.fechaEmision = iso(f2[1], MESES_N[norm(f2[2])], f2[3]);
+  d.moneda = /d[oó]lar|US\$/i.test(t) ? 'USD' : 'PEN';
+  if (d.tipo === 'RECIBO POR HONORARIOS') {
+    d.total = montoTras(t, 'total\\s+por\\s+honorarios') || montoTras(t, 'honorarios');
+    d.retencion = montoTras(t, 'retenci[oó]n\\s*\\(?\\s*\\d+(?:[.,]\\d+)?\\s*%\\s*\\)?\\s*(?:IR|renta)?') || 0;
+    const pct = /retenci[oó]n\s*\(?\s*(\d+(?:[.,]\d+)?)\s*%/i.exec(t); if (pct) d.porcentajeRetencion = num(pct[1]);
+    const neto = montoTras(t, 'total\\s+neto(?:\\s+recibido)?');
+    if (!d.total && neto) d.total = r2(neto + (d.retencion || 0));
+    d.igv = 0;
+    const conc = /por\s+concepto\s+de\s*:?\s*([\s\S]+?)(?:\n\s*(?:observaci|inciso|total|fecha|forma de pago|la suma)|$)/i.exec(t);
+    d.items = [{ descripcion: conc ? limpio(conc[1]).slice(0, 200) : 'SERVICIOS PROFESIONALES', cantidad: 1, valorUnitario: d.total, subtotal: d.total }];
+  } else {
+    d.total = montoTras(t, 'importe\\s+total') || montoTras(t, 'total\\s+a\\s+pagar') || montoTras(t, '\\btotal\\b');
+    d.igv = montoTras(t, '\\bI\\.?G\\.?V\\.?(?:\\s*\\(?18\\s*%\\)?)?');
+    d.subtotal = montoTras(t, 'op(?:\\.|eraci[oó]n)?\\s*gravada') || montoTras(t, 'valor\\s+de\\s+venta') || montoTras(t, 'sub\\s*-?\\s*total') || (d.total && d.igv ? r2(d.total - d.igv) : 0);
+    if (d.igv && d.total && Math.abs(d.subtotal + d.igv - d.total) > 0.1) d.subtotal = r2(d.total - d.igv);
+    const cond = /(\d+)\s*d[ií]as/i.exec(t); d.condicionPago = /contado/i.test(t) ? 'CONTADO' : cond ? `${cond[1]} DIAS CREDITO` : null;
+  }
+  return d;
+}
+$('cLeer').addEventListener('click', async () => {
+  const a = ED?.archivo || ED?.adjData;
+  if (!a) return msgComp('Primero sube el PDF o la foto del comprobante.', 'error');
+  const b = $('cLeer'); ocupado(b, true, 'Leyendo…');
+  try {
+    let txt = '', via = '';
+    if (a.mime === 'application/pdf') {
+      msgComp('Leyendo el texto del PDF…'); txt = await textoPDF(a); via = 'Datos leídos del texto del PDF.';
+      if (txt.replace(/\s/g, '').length < 60) { msgComp('El PDF es una imagen escaneada. Reconociendo el texto (la primera vez tarda un poco más)…'); txt = await ocr(await imagenDePDF(a), p => msgComp(`Reconociendo el texto… ${p}%`)); via = 'Datos leídos por OCR del PDF escaneado.'; }
+    } else {
+      msgComp('Reconociendo el texto de la foto (la primera vez descarga el lector, puede tardar)…');
+      txt = await ocr(`data:${a.mime};base64,${a.d}`, p => msgComp(`Reconociendo el texto… ${p}%`)); via = 'Datos leídos por OCR de la foto.';
+    }
+    const d = parsearComprobante(txt); d._fuente = via;
+    if (!d.total && !d.proveedorRuc && !d.serie) return msgComp('No se encontraron datos en el comprobante. Prueba con una foto más nítida y derecha, o llénalo a mano.', 'error');
+    aplicarIA(d);
+    if (!d.total) msgComp(via + ' No se encontró el monto total: escríbelo en el detalle. <b>Revisa todo con la imagen.</b>', '');
+  } catch (e) { msgComp('No se pudo leer el comprobante: ' + esc(e.message), 'error'); }
+  ocupado(b, false);
+});
 
 /* ---------- Guardar ---------- */
 const idComp = (ruc, tipo, serie, numero) => `${ruc}_${tipo.replace(/\s+/g, '')}_${serie}-${numero}`.replace(/[\/#?\[\]]/g, '');
@@ -566,6 +680,7 @@ function leerForm() {
     fechaEmision: $('cFecha').value, fechaVence: $('cVence').value, ruc: limpio($('cRuc').value), razon: limpio($('cRazon').value).toUpperCase(),
     condicion: $('cCond').value, forma: $('cForma').value, moneda: $('cMoneda').value, gasto: $('cGasto').value, centro: $('cCentro').value,
     afectoIgv: $('cIgv').value, contable: $('cCont').value, detraccion: $('cDet').value, detPct: num($('cDetPct').value),
+    retencion: $('cRet').value, retPct: num($('cRetPct').value),
     empresa: $('cEmpresa').value, destino: $('cDestino').value, solicitud: limpio($('cSol').value), notas: limpio($('cNotas').value)
   };
   f.empresaRuc = LISTAS.empresas.find(e => e.nombre === f.empresa)?.ruc || '';
