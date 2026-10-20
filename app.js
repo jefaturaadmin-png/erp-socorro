@@ -9,6 +9,8 @@ import { firebaseConfig } from './firebase-config.js';
 const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nombre de usuario
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
+const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
+const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
   { id: 'inicio', nombre: 'Inicio', grupo: 'General' },
@@ -510,7 +512,7 @@ $('cIA').addEventListener('click', async () => {
   if (!IA?.clave) return msgComp('Falta la clave de Gemini. El administrador la pone en Configuración.', 'error');
   const b = $('cIA'); ocupado(b, true, 'Leyendo…'); msgComp('Leyendo el comprobante con IA, espera unos segundos…', '');
   try {
-    const modelo = limpio(IA.modelo) || 'gemini-2.5-flash';
+    const modelo = !limpio(IA.modelo) || MODELOS_RETIRADOS.includes(limpio(IA.modelo)) ? MODELO_IA : limpio(IA.modelo);
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent?key=${encodeURIComponent(IA.clave)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ inline_data: { mime_type: a.mime, data: a.d } }, { text: PROMPT_IA }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0 } })
@@ -998,7 +1000,7 @@ $('fUsr').addEventListener('submit', async e => {
 
 /* ================= Configuración ================= */
 function abrirConfig() {
-  $('cfClave').value = IA?.clave || ''; $('cfModelo').value = IA?.modelo || 'gemini-2.5-flash';
+  $('cfClave').value = IA?.clave || ''; $('cfModelo').value = !IA?.modelo || MODELOS_RETIRADOS.includes(IA.modelo) ? MODELO_IA : IA.modelo;
   $('cfEmpresas').value = LISTAS.empresas.map(e => e.nombre + (e.ruc ? ' | ' + e.ruc : '')).join('\n');
   $('cfAreas').value = LISTAS.areas.join('\n'); $('cfGastos').value = LISTAS.gastos.join('\n'); $('cfFormas').value = LISTAS.formas.join('\n');
   $('cfCond').value = LISTAS.condiciones.join('\n'); $('cfUnid').value = LISTAS.unidades.join('\n'); $('cfCargos').value = LISTAS.cargos.join('\n');
@@ -1013,7 +1015,7 @@ $('cfGuardar').addEventListener('click', async e => {
   const b = e.currentTarget; ocupado(b, true, 'Guardando…');
   try {
     await setDoc(doc(db, 'config', 'listas'), l);
-    await setDoc(doc(db, 'config', 'ia'), { clave: limpio($('cfClave').value), modelo: limpio($('cfModelo').value) || 'gemini-2.5-flash' });
+    await setDoc(doc(db, 'config', 'ia'), { clave: limpio($('cfClave').value), modelo: limpio($('cfModelo').value) || MODELO_IA });
     await cargarBase(); toast('Configuración guardada.');
   } catch (err) { toast(errorTexto(err), true); }
   ocupado(b, false);
