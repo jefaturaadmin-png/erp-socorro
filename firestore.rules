@@ -65,7 +65,7 @@ service cloud.firestore {
     match /movimientos/{id} {
       allow read: if activo();
       allow create: if rol(['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN']);
-      allow update, delete: if false; // el kardex no se edita: se corrige con ajustes
+      allow update, delete: if esAdmin(); // solo el administrador corrige o elimina movimientos
     }
 
     // Personal

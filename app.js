@@ -807,7 +807,7 @@ async function anularComp(c) {
 /* ================= Kardex ================= */
 let kSel = null, kMovs = [];
 function abrirKardex() {
-  $('kMov').hidden = !puede('kardex'); $('kImp').hidden = YO.rol !== 'ADMIN';
+  $('kMov').hidden = !puede('kardex'); $('kImp').hidden = $('kDeshacer').hidden = YO.rol !== 'ADMIN';
   pintarKardex();
 }
 $('kBuscar').addEventListener('input', pintarKardex);
@@ -825,29 +825,148 @@ $('kProds').addEventListener('click', async e => {
   const tr = e.target.closest('tr[data-id]'); if (!tr) return;
   kSel = tr.dataset.id; document.querySelectorAll('#kProds tr').forEach(x => x.classList.toggle('sel', x === tr));
   $('kDet').innerHTML = '<div class="vacio">Cargando movimientos…</div>';
-  try { const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', kSel))); kMovs = s.docs.map(d => d.data()).sort((a, b) => a.ms - b.ms); pintarDetKardex(); }
+  try { const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', kSel))); kMovs = ordenarMovs(s.docs.map(d => ({ id: d.id, ...d.data() }))); pintarDetKardex(); }
   catch (err) { $('kDet').innerHTML = `<div class="aviso error">${esc(errorTexto(err))}</div>`; }
 });
 function nombreCC(t) {
   const c = String(t || '').trim(); const x = (LISTAS.codigosCC || []).find(k => k.codigo === c);
   return x && x.nombre ? `${c} · ${x.nombre}` : c;
 }
+const esEntrada = m => m.tipo === 'ENTRADA' || m.origen === 'AJUSTE+' || m.origen === 'SALDO INICIAL';
+const ordenarMovs = l => l.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || a.ms - b.ms);
 function pintarDetKardex() {
   const p = PRODUCTOS.get(kSel); if (!p) return;
-  $('kDet').innerHTML = `<div class="cab"><div><h3 style="margin:0">${esc(p.nombre)}</h3><p class="nota">${esc(p.codigo)} · ${esc(p.unidad)}</p></div><button class="btn sec chico" type="button" id="kCsvMov">Exportar este kardex</button></div>
+  const adm = YO.rol === 'ADMIN';
+  $('kDet').innerHTML = `<div class="cab"><div><h3 style="margin:0">${esc(p.nombre)}</h3><p class="nota">${esc(p.codigo)} · ${esc(p.unidad)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</p></div>
+      <div class="acc">${adm ? '<button class="btn sec chico" type="button" id="kEdProd">Editar producto</button><button class="btn sec chico" type="button" id="kAddMov">+ Agregar movimiento</button><button class="btn sec chico" type="button" id="kRecalc" title="Vuelve a calcular saldos y costo promedio en orden de fecha">Recalcular</button>' : ''}<button class="btn sec chico" type="button" id="kCsvMov">Exportar este kardex</button></div></div>
     <div class="ficha"><div>Stock<b>${nq(p.stock)}</b></div><div>Costo promedio<b>S/ ${n2(p.cProm)}</b></div><div>Valor<b>S/ ${n2(p.valor)}</b></div><div>Movimientos<b>${kMovs.length}</b></div></div>
-    <div class="tabla"><table><thead><tr><th>Fecha</th><th>Mov.</th><th>Documento</th><th>Proveedor / destino</th><th class="num">Entrada</th><th class="num">Salida</th><th class="num">Saldo</th><th class="num">C. unit</th><th class="num">C. total</th><th class="num">C. prom.</th><th class="num">Saldo S/</th></tr></thead>
-    <tbody>${kMovs.length ? kMovs.map(m => { const ent = m.tipo === 'ENTRADA' || m.origen === 'AJUSTE+'; const t = m.tipo === 'AJUSTE' ? 'AJUSTE' : m.tipo; return `<tr><td>${fmtF(m.fecha)}</td><td><span class="pill ${t}">${esc(m.origen === 'ANULACION' ? 'ANULA' : m.tipo === 'AJUSTE' ? m.origen : m.tipo)}</span></td><td>${esc(m.documento)}${m.lote ? `<br><small class="nota">Lote ${esc(m.lote)}${m.vence ? ' · vence ' + fmtF(m.vence) : ''}</small>` : ''}</td><td>${esc(nombreCC(m.tercero))}${m.persona ? `<br><small class="nota">${esc(m.persona)}</small>` : ''}</td><td class="num">${ent ? nq(m.cant) : ''}</td><td class="num">${ent ? '' : nq(m.cant)}</td><td class="num"><b>${nq(m.saldoCant)}</b></td><td class="num">${n2(m.cu)}</td><td class="num">${n2(m.ct)}</td><td class="num">${n2(m.cProm)}</td><td class="num">${n2(m.saldoValor)}</td></tr>`; }).join('') : '<tr><td colspan="11" class="vacio">Sin movimientos.</td></tr>'}</tbody></table></div>`;
+    <div class="tabla"><table><thead><tr><th>Fecha</th><th>Mov.</th><th>Documento</th><th>Proveedor / destino</th><th class="num">Entrada</th><th class="num">Salida</th><th class="num">Saldo</th><th class="num">C. unit</th><th class="num">C. total</th><th class="num">C. prom.</th><th class="num">Saldo S/</th>${adm ? '<th></th>' : ''}</tr></thead>
+    <tbody>${kMovs.length ? kMovs.map(m => { const ent = esEntrada(m); const t = m.tipo === 'AJUSTE' ? 'AJUSTE' : m.tipo; const etq = m.origen === 'ANULACION' ? 'ANULA' : m.origen === 'SALDO INICIAL' ? 'SALDO INICIAL' : m.tipo === 'AJUSTE' ? m.origen : m.tipo;
+      return `<tr${m.saldoCant < -1e-9 ? ' style="background:var(--rojo-f)"' : ''}><td>${fmtF(m.fecha)}</td><td><span class="pill ${t}">${esc(etq)}</span></td><td>${esc(m.documento)}${m.lote ? `<br><small class="nota">Lote ${esc(m.lote)}${m.vence ? ' · vence ' + fmtF(m.vence) : ''}</small>` : ''}</td><td>${esc(nombreCC(m.tercero))}${m.persona ? `<br><small class="nota">${esc(m.persona)}</small>` : ''}</td><td class="num">${ent ? nq(m.cant) : ''}</td><td class="num">${ent ? '' : nq(m.cant)}</td><td class="num"><b>${nq(m.saldoCant)}</b></td><td class="num">${n2(m.cu)}</td><td class="num">${n2(m.ct)}</td><td class="num">${n2(m.cProm)}</td><td class="num">${n2(m.saldoValor)}</td>${adm ? `<td><div class="acciones"><button class="btn sec chico" data-ed="${esc(m.id)}">Editar</button><button class="btn peligro chico" data-del="${esc(m.id)}" aria-label="Eliminar movimiento">×</button></div></td>` : ''}</tr>`; }).join('') : `<tr><td colspan="12" class="vacio">Sin movimientos.</td></tr>`}</tbody></table></div>`;
   $('kCsvMov').addEventListener('click', () => descargarCSV(`kardex_${p.codigo}.csv`, filasKardex(kMovs)));
+  if (adm) {
+    $('kEdProd').addEventListener('click', () => abrirEdProd(p));
+    $('kAddMov').addEventListener('click', () => abrirEdMov(null));
+    $('kRecalc').addEventListener('click', async e => { ocupado(e.currentTarget, true, 'Recalculando…'); try { await recalcularProducto(p.id); toast('Kardex recalculado.'); } catch (err) { toast(errorTexto(err), true); } });
+  }
 }
+$('kDet').addEventListener('click', async e => {
+  const ed = e.target.closest('[data-ed]'), del = e.target.closest('[data-del]');
+  if (ed) return abrirEdMov(kMovs.find(m => m.id === ed.dataset.ed));
+  if (del) {
+    const m = kMovs.find(x => x.id === del.dataset.del); if (!m) return;
+    if (!confirm(`¿Eliminar este movimiento?\n${fmtF(m.fecha)} · ${m.documento || ''} · ${nq(m.cant)} ${m.unidad || ''}\n\nLos saldos se recalculan solos.`)) return;
+    ocupado(del, true);
+    try { await deleteDoc(doc(db, 'movimientos', m.id)); await recalcularProducto(kSel); toast('Movimiento eliminado.'); } catch (err) { toast(errorTexto(err), true); ocupado(del, false); }
+  }
+});
+// Vuelve a calcular saldos, costo promedio y valor de todos los movimientos del producto, en orden de fecha
+async function recalcularProducto(pid) {
+  const p = PRODUCTOS.get(pid) || (await getDoc(doc(db, 'productos', pid))).data();
+  const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', pid)));
+  const l = ordenarMovs(s.docs.map(d => ({ id: d.id, ...d.data() })));
+  let st = 0, val = 0, lote = writeBatch(db), ops = 0;
+  for (const m of l) {
+    const q = r4(m.cant); let cu = r4(m.cu || 0);
+    if (esEntrada(m)) { st = r4(st + q); val = r2(val + q * cu); }
+    else { cu = st > 1e-9 ? r4(val / st) : cu; st = r4(st - q); val = st <= 1e-9 ? 0 : r2(val - q * cu); }
+    const nuevo = { cu, ct: r2(q * cu), saldoCant: st, cProm: st > 0 ? r4(val / st) : 0, saldoValor: st > 0 ? val : 0, producto: p.nombre, unidad: p.unidad, codigo: p.codigo };
+    if (Object.keys(nuevo).some(k => m[k] !== nuevo[k])) { lote.update(doc(db, 'movimientos', m.id), nuevo); if (++ops >= 450) { await lote.commit(); lote = writeBatch(db); ops = 0; } }
+    Object.assign(m, nuevo);
+  }
+  lote.update(doc(db, 'productos', pid), { stock: st, valor: st > 0 ? val : 0, cProm: st > 0 ? r4(val / st) : 0, actMs: Date.now(), ultMov: l.length ? l[l.length - 1].fecha : '' });
+  await lote.commit();
+  if (kSel === pid) { kMovs = l; const pp = PRODUCTOS.get(pid); if (pp) Object.assign(pp, { stock: st, valor: st > 0 ? val : 0, cProm: st > 0 ? r4(val / st) : 0 }); pintarDetKardex(); }
+}
+/* Editar o agregar un movimiento (solo administrador) */
+let edMov = null;
+function abrirEdMov(m) {
+  edMov = m;
+  $('emTit').textContent = m ? 'Editar movimiento' : 'Agregar movimiento';
+  $('emFecha').value = m?.fecha || hoyISO();
+  $('emTipo').value = !m ? 'ENTRADA' : m.origen === 'SALDO INICIAL' ? 'SALDO INICIAL' : m.tipo === 'AJUSTE' ? m.origen : m.tipo;
+  $('emDoc').value = m?.documento || ''; $('emTercero').value = m?.tercero || ''; $('emPersona').value = m?.persona || '';
+  $('emCant').value = m?.cant ?? ''; $('emCu').value = m?.cu ?? (PRODUCTOS.get(kSel)?.cProm || '');
+  $('emMsg').textContent = ''; $('emAviso').textContent = m?.comprobanteId ? 'Este movimiento viene de un comprobante registrado; si lo cambias aquí, el comprobante no se modifica.' : '';
+  emTipoCambio(); $('dEdMov').showModal();
+}
+function emTipoCambio() { const t = $('emTipo').value; $('emCuL').hidden = !(t === 'ENTRADA' || t === 'AJUSTE+' || t === 'SALDO INICIAL'); }
+$('emTipo').addEventListener('change', emTipoCambio);
+$('emCerrar').addEventListener('click', () => $('dEdMov').close());
+$('fEdMov').addEventListener('submit', async e => {
+  e.preventDefault();
+  const t = $('emTipo').value, q = r4(num($('emCant').value));
+  if (q <= 0) return $('emMsg').textContent = 'La cantidad debe ser mayor a cero.';
+  if (!$('emFecha').value) return $('emMsg').textContent = 'Falta la fecha.';
+  const ent = t === 'ENTRADA' || t === 'AJUSTE+' || t === 'SALDO INICIAL';
+  const origenPrev = edMov?.origen;
+  const d = {
+    fecha: $('emFecha').value, cant: q, documento: limpio($('emDoc').value), tercero: limpio($('emTercero').value).toUpperCase(), persona: limpio($('emPersona').value),
+    tipo: t === 'ENTRADA' ? 'ENTRADA' : t === 'SALIDA' ? 'SALIDA' : 'AJUSTE',
+    origen: t === 'ENTRADA' ? (origenPrev === 'COMPRA' ? 'COMPRA' : 'COMPRA') : t === 'SALIDA' ? (['CONSUMO', 'ANULACION'].includes(origenPrev) ? origenPrev : 'CONSUMO') : t,
+    editadoPor: YO.nombre, editadoMs: Date.now()
+  };
+  if (ent) d.cu = r4(num($('emCu').value));
+  const b = e.submitter; ocupado(b, true, 'Guardando…');
+  try {
+    if (edMov) await updateDoc(doc(db, 'movimientos', edMov.id), d);
+    else { const p = PRODUCTOS.get(kSel); await setDoc(doc(collection(db, 'movimientos')), { ...d, cu: d.cu ?? p.cProm ?? 0, productoId: kSel, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, ms: Date.now(), usuario: YO.nombre, uid: YO.uid, creado: serverTimestamp() }); }
+    await recalcularProducto(kSel);
+    $('dEdMov').close(); toast('Movimiento guardado y kardex recalculado.');
+  } catch (err) { $('emMsg').textContent = errorTexto(err); }
+  ocupado(b, false);
+});
+/* Editar o eliminar un producto (solo administrador) */
+function abrirEdProd(p) {
+  $('epNombre').value = p.nombre; $('epCat').value = p.categoria || ''; $('epMsg').textContent = '';
+  opciones($('epUnidad'), LISTAS.unidades, p.unidad);
+  $('dEdProd').showModal();
+}
+$('epCerrar').addEventListener('click', () => $('dEdProd').close());
+$('fEdProd').addEventListener('submit', async e => {
+  e.preventDefault();
+  const nombre = limpio($('epNombre').value).toUpperCase(); if (!nombre) return $('epMsg').textContent = 'Falta el nombre.';
+  const otro = [...PRODUCTOS.values()].find(x => x.id !== kSel && norm(x.nombre) === norm(nombre));
+  if (otro) return $('epMsg').textContent = `Ya existe otro producto con ese nombre (${otro.codigo}).`;
+  const b = e.submitter; ocupado(b, true, 'Guardando…');
+  try {
+    await updateDoc(doc(db, 'productos', kSel), { nombre, nombreN: norm(nombre), unidad: $('epUnidad').value, categoria: limpio($('epCat').value).toUpperCase(), actMs: Date.now() });
+    Object.assign(PRODUCTOS.get(kSel), { nombre, unidad: $('epUnidad').value });
+    await recalcularProducto(kSel);
+    $('dEdProd').close(); toast('Producto actualizado.');
+  } catch (err) { $('epMsg').textContent = errorTexto(err); }
+  ocupado(b, false);
+});
+async function borrarProducto(pid) {
+  const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', pid)));
+  let lote = writeBatch(db), ops = 0;
+  for (const d of s.docs) { lote.delete(d.ref); if (++ops >= 450) { await lote.commit(); lote = writeBatch(db); ops = 0; } }
+  lote.delete(doc(db, 'productos', pid)); await lote.commit();
+}
+$('epBorrar').addEventListener('click', async e => {
+  const p = PRODUCTOS.get(kSel); if (!p) return;
+  if (!confirm(`¿Eliminar ${p.codigo} · ${p.nombre} con TODOS sus movimientos? No se puede deshacer.`)) return;
+  ocupado(e.currentTarget, true, 'Eliminando…');
+  try { await borrarProducto(kSel); kSel = null; $('dEdProd').close(); $('kDet').innerHTML = '<div class="vacio">Producto eliminado.</div>'; toast('Producto eliminado.'); } catch (err) { $('epMsg').textContent = errorTexto(err); }
+  ocupado(e.currentTarget, false);
+});
+$('kDeshacer').addEventListener('click', async e => {
+  const imp = [...PRODUCTOS.values()].filter(p => p.importado);
+  if (!imp.length) return toast('No hay productos importados de Excel.');
+  if (!confirm(`Se eliminarán ${imp.length} productos importados de Excel con todos sus movimientos, para volver a importarlos. ¿Continuar?`)) return;
+  const b = e.currentTarget; ocupado(b, true, 'Eliminando…');
+  try { let k = 0; for (const p of imp) { await borrarProducto(p.id); b.textContent = `Eliminando… ${++k}/${imp.length}`; } kSel = null; $('kDet').innerHTML = '<div class="vacio">Importación deshecha. Ya puedes volver a importar el Excel.</div>'; toast('Importación deshecha.'); }
+  catch (err) { toast(errorTexto(err), true); }
+  ocupado(b, false);
+});
 function filasKardex(movs) {
   return [['Código', 'Producto', 'Unidad', 'Fecha', 'Movimiento', 'Origen', 'Documento', 'Proveedor / destino', 'Entregado a', 'Entrada', 'Salida', 'Saldo cantidad', 'Costo unitario', 'Costo total', 'Costo promedio', 'Saldo valorizado', 'Lote', 'Vencimiento', 'Usuario']]
-    .concat(movs.map(m => { const ent = m.tipo === 'ENTRADA' || m.origen === 'AJUSTE+'; return [m.codigo, m.producto, m.unidad, fmtF(m.fecha), m.tipo, m.origen, m.documento, m.tercero || '', m.persona || '', ent ? String(m.cant).replace('.', ',') : '', ent ? '' : String(m.cant).replace('.', ','), String(m.saldoCant).replace('.', ','), numCSV(m.cu), numCSV(m.ct), numCSV(m.cProm), numCSV(m.saldoValor), m.lote || '', fmtF(m.vence), m.usuario]; }));
+    .concat(movs.map(m => { const ent = esEntrada(m); return [m.codigo, m.producto, m.unidad, fmtF(m.fecha), m.tipo, m.origen, m.documento, m.tercero || '', m.persona || '', ent ? String(m.cant).replace('.', ',') : '', ent ? '' : String(m.cant).replace('.', ','), String(m.saldoCant).replace('.', ','), numCSV(m.cu), numCSV(m.ct), numCSV(m.cProm), numCSV(m.saldoValor), m.lote || '', fmtF(m.vence), m.usuario]; }));
 }
 $('kCsvProd').addEventListener('click', () => descargarCSV('productos_kardex.csv', [['Código', 'Producto', 'Unidad', 'Stock', 'Costo promedio', 'Valor', 'Último movimiento']].concat([...PRODUCTOS.values()].sort((a, b) => a.codigo.localeCompare(b.codigo)).map(p => [p.codigo, p.nombre, p.unidad, String(p.stock).replace('.', ','), numCSV(p.cProm), numCSV(p.valor), fmtF(p.ultMov)]))));
 $('kCsvTodo').addEventListener('click', async e => {
   const b = e.currentTarget; ocupado(b, true, 'Preparando…');
-  try { const s = await getDocs(collection(db, 'movimientos')); const m = s.docs.map(d => d.data()).sort((a, b2) => a.codigo.localeCompare(b2.codigo) || a.ms - b2.ms); descargarCSV('kardex_completo.csv', filasKardex(m)); }
+  try { const s = await getDocs(collection(db, 'movimientos')); const m = s.docs.map(d => d.data()).sort((a, b2) => a.codigo.localeCompare(b2.codigo) || (a.fecha || '').localeCompare(b2.fecha || '') || a.ms - b2.ms); descargarCSV('kardex_completo.csv', filasKardex(m)); }
   catch (err) { toast(errorTexto(err), true); }
   ocupado(b, false);
 });
@@ -861,7 +980,11 @@ $('kImpFile').addEventListener('change', async e => {
   try {
     await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     const wb = window.XLSX.read(await f.arrayBuffer(), { type: 'array' });
-    IMP = wb.SheetNames.map(n => leerHojaKardex(n, window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: null }))).filter(Boolean);
+    IMP = wb.SheetNames.map(n => {
+      const ws = wb.Sheets[n];
+      if (ws['!ref']) { const r = window.XLSX.utils.decode_range(ws['!ref']); r.s.c = 0; r.s.r = 0; ws['!ref'] = window.XLSX.utils.encode_range(r); } // empezar siempre en A1
+      return leerHojaKardex(n, window.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null }));
+    }).filter(Boolean);
     const vistos = new Map();
     IMP.forEach(h => {
       const k = norm(h.nombre);
@@ -886,6 +1009,9 @@ function leerHojaKardex(hoja, filas) {
   const valorTras = (rx) => { for (let r = 0; r < Math.min(filas.length, 15); r++) { const f = filas[r] || []; const i = f.findIndex(v => rx.test(String(v ?? ''))); if (i >= 0) { const v = f.slice(i + 1).find(x => x !== null && String(x).trim() !== ''); return v === undefined ? '' : limpio(v); } } return ''; };
   const ini = filas.findIndex(f => (f || []).some(v => norm(v) === 'fecha'));
   if (ini < 0) return null;
+  // La columna "Fecha" debe quedar en la posición B; si el Excel empieza en otra columna, se corre todo
+  const off = 1 - filas[ini].findIndex(v => norm(v) === 'fecha');
+  if (off) filas = filas.map(f => off > 0 ? [...Array(off).fill(null), ...(f || [])] : (f || []).slice(-off));
   const nombre = limpio(valorTras(/DESCRIPCI[OÓ]N DEL PRODUCTO/i) || hoja).toUpperCase();
   const uRaw = limpio(valorTras(/UNIDAD DE MEDIDA/i)).toUpperCase();
   const h = { hoja, nombre, unidad: UNI_IMP[uRaw] || uRaw || 'UND', movs: [], avisos: [], sel: true, ini: 0, ent: 0, sal: 0 };
@@ -1008,7 +1134,7 @@ $('fMov').addEventListener('submit', async e => {
       });
     });
     $('dMov').close(); toast('Movimiento registrado.');
-    if (kSel === p.id) { const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', kSel))); kMovs = s.docs.map(d => d.data()).sort((a, b2) => a.ms - b2.ms); pintarDetKardex(); }
+    if (kSel === p.id) { const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', kSel))); kMovs = ordenarMovs(s.docs.map(d => ({ id: d.id, ...d.data() }))); pintarDetKardex(); }
   } catch (err) { $('mMsg').textContent = errorTexto(err); }
   ocupado(b, false);
 });

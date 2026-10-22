@@ -277,7 +277,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
       <!-- Kardex -->
       <section id="m-kardex" class="mod" hidden>
         <div class="cab"><div><h2>Kardex</h2><p class="nota">Almacén único. Costo promedio ponderado, valores sin IGV.</p></div>
-          <div class="acc"><button class="btn" type="button" id="kMov">Registrar salida / ajuste</button><button class="btn sec" type="button" id="kImp">Importar Excel de kardex</button><input type="file" id="kImpFile" accept=".xlsx,.xls" hidden><button class="btn sec" type="button" id="kCsvProd">Exportar productos</button><button class="btn sec" type="button" id="kCsvTodo">Exportar kardex completo</button></div></div>
+          <div class="acc"><button class="btn" type="button" id="kMov">Registrar salida / ajuste</button><button class="btn sec" type="button" id="kImp">Importar Excel de kardex</button><button class="btn peligro" type="button" id="kDeshacer">Deshacer importación</button><input type="file" id="kImpFile" accept=".xlsx,.xls" hidden><button class="btn sec" type="button" id="kCsvProd">Exportar productos</button><button class="btn sec" type="button" id="kCsvTodo">Exportar kardex completo</button></div></div>
         <div class="tarjetas" id="kTarjetas"></div>
         <div class="dos">
           <div class="panel">
@@ -425,6 +425,42 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
       <div class="tabla"><table><thead><tr><th><input type="checkbox" id="impTodos" checked aria-label="Seleccionar todos"></th><th>Hoja</th><th>Producto</th><th>Unidad</th><th class="num">Saldo inicial</th><th class="num">Entradas</th><th class="num">Salidas</th><th class="num">Stock final</th><th class="num">C. prom.</th><th class="num">Valor</th><th>Revisar</th></tr></thead><tbody id="impFilas"></tbody></table></div>
     </div>
   </div>
+</dialog>
+
+<!-- Diálogo: editar movimiento -->
+<dialog id="dEdMov" class="dlg medio" aria-labelledby="emTit">
+  <form id="fEdMov">
+    <div class="dlg-cab"><h2 id="emTit">Editar movimiento</h2><div class="acc"><button type="submit" class="btn">Guardar</button><button type="button" class="btn sec" id="emCerrar">Cancelar</button></div></div>
+    <div class="dlg-cuerpo">
+      <div class="g2">
+        <label>Fecha<input id="emFecha" type="date" required></label>
+        <label>Movimiento<select id="emTipo"><option value="SALDO INICIAL">Saldo inicial</option><option value="ENTRADA">Entrada (compra)</option><option value="SALIDA">Salida (consumo / entrega)</option><option value="AJUSTE+">Ajuste de ingreso (+)</option><option value="AJUSTE-">Ajuste de salida (−)</option></select></label>
+        <label>Cantidad<input id="emCant" type="number" step="any" min="0" required></label>
+        <label id="emCuL">Costo unitario<input id="emCu" type="number" step="any" min="0"></label>
+        <label>Documento<input id="emDoc" maxlength="80"></label>
+        <label>Proveedor / centro de costos<input id="emTercero" maxlength="80"></label>
+        <label class="s2">Entregado a<input id="emPersona" list="dlPersonal" maxlength="80"></label>
+      </div>
+      <p class="nota">En las salidas el costo lo pone el sistema (costo promedio). Al guardar se recalculan los saldos del producto en orden de fecha.</p>
+      <p class="nota" id="emAviso" style="color:var(--ambar)"></p>
+      <div class="msg" id="emMsg" style="text-align:left"></div>
+    </div>
+  </form>
+</dialog>
+
+<!-- Diálogo: editar producto -->
+<dialog id="dEdProd" class="dlg medio" aria-labelledby="epTit">
+  <form id="fEdProd">
+    <div class="dlg-cab"><h2 id="epTit">Editar producto</h2><div class="acc"><button type="submit" class="btn">Guardar</button><button type="button" class="btn peligro" id="epBorrar">Eliminar producto</button><button type="button" class="btn sec" id="epCerrar">Cancelar</button></div></div>
+    <div class="dlg-cuerpo">
+      <div class="g2">
+        <label class="s2">Nombre<input id="epNombre" required maxlength="150"></label>
+        <label>Unidad<select id="epUnidad"></select></label>
+        <label>Categoría<input id="epCat" maxlength="60"></label>
+      </div>
+      <div class="msg" id="epMsg" style="text-align:left"></div>
+    </div>
+  </form>
 </dialog>
 
 <!-- Diálogo: salida / ajuste de kardex -->
