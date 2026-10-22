@@ -277,7 +277,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
       <!-- Kardex -->
       <section id="m-kardex" class="mod" hidden>
         <div class="cab"><div><h2>Kardex</h2><p class="nota">Almacén único. Costo promedio ponderado, valores sin IGV.</p></div>
-          <div class="acc"><button class="btn" type="button" id="kMov">Registrar salida / ajuste</button><button class="btn sec" type="button" id="kCsvProd">Exportar productos</button><button class="btn sec" type="button" id="kCsvTodo">Exportar kardex completo</button></div></div>
+          <div class="acc"><button class="btn" type="button" id="kMov">Registrar salida / ajuste</button><button class="btn sec" type="button" id="kImp">Importar Excel de kardex</button><input type="file" id="kImpFile" accept=".xlsx,.xls" hidden><button class="btn sec" type="button" id="kCsvProd">Exportar productos</button><button class="btn sec" type="button" id="kCsvTodo">Exportar kardex completo</button></div></div>
         <div class="tarjetas" id="kTarjetas"></div>
         <div class="dos">
           <div class="panel">
@@ -342,6 +342,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
           <label>Condiciones de pago<textarea id="cfCond" rows="4"></textarea></label>
           <label>Unidades de medida<textarea id="cfUnid" rows="4"></textarea></label>
           <label>Cargos del personal<textarea id="cfCargos" rows="4"></textarea></label>
+          <label>Códigos de centro de costos del kardex (CÓDIGO | NOMBRE)<textarea id="cfCodCC" rows="4" placeholder="101 | ADMINISTRACIÓN"></textarea></label>
         </div>
       </section>
 
@@ -411,6 +412,18 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
   <div style="display:flex;flex-direction:column;height:100%">
     <div class="dlg-cab"><h2>Comprobante</h2><button type="button" class="btn sec" id="imgCerrar">Cerrar</button></div>
     <div class="dlg-cuerpo" id="imgCuerpo" style="flex:1;overflow:auto;align-items:center"></div>
+  </div>
+</dialog>
+
+<!-- Diálogo: importar kardex desde Excel -->
+<dialog id="dImp" class="dlg grande" aria-labelledby="impTit">
+  <div style="display:flex;flex-direction:column;height:100%">
+    <div class="dlg-cab"><h2 id="impTit">Importar kardex desde Excel</h2>
+      <div class="acc"><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="impCuadre" checked> Cuadrar con el saldo final del Excel</label><label style="flex-direction:row;align-items:center;gap:6px">Categoría <input id="impCat" value="ÚTILES DE LIMPIEZA" style="width:200px"></label><button type="button" class="btn" id="impOk">Importar</button><button type="button" class="btn sec" id="impCerrar">Cancelar</button></div></div>
+    <div class="dlg-cuerpo" style="flex:1;overflow:auto">
+      <div class="aviso" id="impMsg"></div>
+      <div class="tabla"><table><thead><tr><th><input type="checkbox" id="impTodos" checked aria-label="Seleccionar todos"></th><th>Hoja</th><th>Producto</th><th>Unidad</th><th class="num">Saldo inicial</th><th class="num">Entradas</th><th class="num">Salidas</th><th class="num">Stock final</th><th class="num">C. prom.</th><th class="num">Valor</th><th>Revisar</th></tr></thead><tbody id="impFilas"></tbody></table></div>
+    </div>
   </div>
 </dialog>
 
