@@ -11,20 +11,22 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06k'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.06p'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
+// El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
+const rolTxt = r => r === 'LOGISTICA' ? 'ADMINISTRACION' : r;
 const MODULOS = [
   { id: 'inicio', nombre: 'Inicio', grupo: 'General' },
-  { id: 'solicitudes', nombre: 'Solicitudes de sucursales', grupo: 'Logística' },
-  { id: 'servicios', nombre: 'Ingreso de servicios', grupo: 'Logística' },
-  { id: 'compras', nombre: 'Ingreso de materiales', grupo: 'Logística' },
-  { id: 'salidas', nombre: 'Salida de materiales', grupo: 'Logística' },
-  { id: 'kardex', nombre: 'Kardex', grupo: 'Logística' },
+  { id: 'solicitudes', nombre: 'Solicitudes de sucursales', grupo: 'Administración' },
+  { id: 'servicios', nombre: 'Ingreso de servicios', grupo: 'Administración' },
+  { id: 'compras', nombre: 'Ingreso de materiales', grupo: 'Administración' },
+  { id: 'salidas', nombre: 'Salida de materiales', grupo: 'Administración' },
+  { id: 'kardex', nombre: 'Kardex', grupo: 'Administración' },
   { id: 'rrhh', nombre: 'Personal', grupo: 'RR. HH.' },
   { id: 'cargo', nombre: 'Cargo de útiles', grupo: 'RR. HH.' },
-  { id: 'usuarios', nombre: 'Usuarios', grupo: 'Administración' },
-  { id: 'config', nombre: 'Configuración', grupo: 'Administración' }
+  { id: 'usuarios', nombre: 'Usuarios', grupo: 'Sistema' },
+  { id: 'config', nombre: 'Configuración', grupo: 'Sistema' }
 ];
 const ACCESO = {
   ADMIN: MODULOS.map(m => m.id),
@@ -53,13 +55,13 @@ const DESC_ROL = {
 const TIPOS_DOC = ['FACTURA', 'BOLETA', 'RECIBO POR HONORARIOS', 'NOTA DE CREDITO', 'NOTA DE DEBITO', 'TICKET', 'OTRO'];
 const DEF_LISTAS = {
   empresas: [{ nombre: 'FS SOCORRO S.A.C.', ruc: '20486562341' }, { nombre: 'FS INNOVA SOCORRO', ruc: '' }, { nombre: 'HEALTH PREVENTIVE', ruc: '' }],
-  areas: ['ADMINISTRACIÓN', 'LOGÍSTICA', 'DROGUERÍA FS', 'REAL', 'MERCADO', 'TUPAC', 'ORTEGA', 'HUANCAS', 'HEROES', 'MCDO. TAMBO', 'PARRA', 'SUMAR', 'PUNO', 'PIOPATA', 'CONCEPCIÓN', 'LIBERTAD', 'ANDALUZ'],
+  areas: ['ADMINISTRACIÓN', 'DROGUERÍA FS', 'REAL', 'MERCADO', 'TUPAC', 'ORTEGA', 'HUANCAS', 'HEROES', 'MCDO. TAMBO', 'PARRA', 'SUMAR', 'PUNO', 'PIOPATA', 'CONCEPCIÓN', 'LIBERTAD', 'ANDALUZ'],
   gastos: ['MATERIALES', 'ACTIVOS MENORES', 'SERVICIOS', 'MANTENIMIENTO', 'ÚTILES DE OFICINA', 'LIMPIEZA', 'UNIFORMES', 'TRANSPORTE', 'PUBLICIDAD', 'ALQUILERES', 'OTROS'],
   formas: ['TRANSFERENCIA BCP', 'TRANSFERENCIA BBVA', 'TRANSFERENCIA INTERBANK', 'EFECTIVO', 'YAPE / PLIN', 'CHEQUE'],
   condiciones: ['CONTADO', '7 DIAS CREDITO', '15 DIAS CREDITO', '30 DIAS CREDITO', '45 DIAS CREDITO', '60 DIAS CREDITO'],
   unidades: ['UND', 'CAJA', 'PAQUETE', 'BOLSA', 'KG', 'LITRO', 'GALÓN', 'METRO', 'PAR', 'JUEGO', 'ROLLO', 'MILLAR'],
   codigosCC: CENTROS_COSTO,
-  cargos: ['QUÍMICO FARMACÉUTICO', 'TÉCNICO EN FARMACIA', 'CAJERO(A)', 'ALMACENERO', 'ASISTENTE ADMINISTRATIVO', 'ASISTENTE DE LOGÍSTICA', 'JEFE DE LOGÍSTICA', 'CONTADOR(A)', 'GERENTE']
+  cargos: ['QUÍMICO FARMACÉUTICO', 'TÉCNICO EN FARMACIA', 'CAJERO(A)', 'ALMACENERO', 'ASISTENTE ADMINISTRATIVO', 'JEFE DE ADMINISTRACIÓN', 'CONTADOR(A)', 'GERENTE']
 };
 const PROMPT_IA = `Eres un asistente contable en Perú. Lee este comprobante de pago (factura, boleta, recibo por honorarios, nota de crédito, etc.) y devuelve SOLO un objeto JSON con esta forma exacta:
 {"tipo":"FACTURA|BOLETA|RECIBO POR HONORARIOS|NOTA DE CREDITO|NOTA DE DEBITO|TICKET|OTRO","serie":"F001","numero":"20538","fechaEmision":"YYYY-MM-DD","fechaVencimiento":"YYYY-MM-DD o null","moneda":"PEN o USD","proveedorRuc":"RUC del emisor","proveedorRazon":"razón social del emisor","clienteRuc":"RUC del cliente o null","clienteRazon":"razón social del cliente o null","condicionPago":"CONTADO o 'N DIAS CREDITO' o null","items":[{"codigo":null,"descripcion":"","unidad":"UND","cantidad":1,"valorUnitario":0,"subtotal":0,"lote":null,"vencimiento":"YYYY-MM-DD o null"}],"subtotal":0,"igv":0,"total":0,"detraccion":false,"porcentajeDetraccion":0,"retencion":0,"porcentajeRetencion":0}
@@ -152,7 +154,7 @@ async function entrar(user) {
     const u = await getDoc(doc(db, 'usuarios', user.uid));
     if (!u.exists() || u.data().activo !== true) { await signOut(auth); $('loginMsg').textContent = 'Tu usuario está desactivado. Habla con el administrador.'; return; }
     YO = { uid: user.uid, ...u.data() };
-    $('yoNombre').textContent = YO.nombre; $('yoRol').textContent = YO.usuario + ' · ' + YO.rol;
+    $('yoNombre').textContent = YO.nombre; $('yoRol').textContent = YO.usuario + ' · ' + rolTxt(YO.rol);
     await cargarBase();
     armarMenu();
     mostrarVista('vApp');
@@ -374,7 +376,7 @@ async function abrirEditor(clase, c, modo) {
   opciones($('cForma'), LISTAS.formas, c?.forma || LISTAS.formas[0]);
   opciones($('cGasto'), LISTAS.gastos, c?.gasto || (compra ? 'MATERIALES' : ''), '— Elegir —');
   opciones($('cCentro'), LISTAS.areas, c?.centro || '', '— Elegir —');
-  opciones($('cDestino'), LISTAS.areas, c?.destino || 'LOGÍSTICA', '— Elegir —');
+  opciones($('cDestino'), LISTAS.areas, c?.destino || 'ADMINISTRACIÓN', '— Elegir —');
   opciones($('cEmpresa'), LISTAS.empresas.map(e => e.nombre), c?.empresa || LISTAS.empresas[0]?.nombre);
   $('cSerie').value = c?.serie || ''; $('cNum').value = c?.numero || ''; $('cFecha').value = c?.fechaEmision || hoyISO();
   $('cRuc').value = c?.ruc || ''; $('cRazon').value = c?.razon || ''; $('cVence').value = c?.fechaVence || '';
@@ -1834,17 +1836,17 @@ $('gTodos').addEventListener('click', () => {
 
 /* ================= Usuarios ================= */
 async function abrirUsuarios() {
-  $('uRoles').innerHTML = '<b>Roles:</b><br>' + ROLES.map(r => `<b>${r}</b>: ${esc(DESC_ROL[r])}`).join('<br>');
+  $('uRoles').innerHTML = '<b>Roles:</b><br>' + ROLES.map(r => `<b>${rolTxt(r)}</b>: ${esc(DESC_ROL[r])}`).join('<br>');
   $('uFilas').innerHTML = '<tr><td colspan="5" class="vacio">Cargando…</td></tr>';
   try {
     const s = await getDocs(collection(db, 'usuarios'));
     const l = s.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a, b) => a.usuario.localeCompare(b.usuario));
-    $('uFilas').innerHTML = l.map(u => `<tr><td>${esc(u.usuario)}</td><td>${esc(u.nombre)}</td><td><select data-rol="${esc(u.uid)}" aria-label="Rol"${u.uid === YO.uid ? ' disabled' : ''}>${ROLES.map(r => `<option${r === u.rol ? ' selected' : ''}>${r}</option>`).join('')}</select></td><td><span class="pill ${u.activo ? 'APROBADO' : 'ANULADO'}">${u.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td>${u.uid === YO.uid ? '<small class="nota">Tú</small>' : `<button class="btn sec chico" data-act="${esc(u.uid)}" data-v="${u.activo ? '0' : '1'}">${u.activo ? 'Desactivar' : 'Activar'}</button>`}</td></tr>`).join('');
+    $('uFilas').innerHTML = l.map(u => `<tr><td>${esc(u.usuario)}</td><td>${esc(u.nombre)}</td><td><select data-rol="${esc(u.uid)}" aria-label="Rol"${u.uid === YO.uid ? ' disabled' : ''}>${ROLES.map(r => `<option value="${r}"${r === u.rol ? ' selected' : ''}>${rolTxt(r)}</option>`).join('')}</select></td><td><span class="pill ${u.activo ? 'APROBADO' : 'ANULADO'}">${u.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td>${u.uid === YO.uid ? '<small class="nota">Tú</small>' : `<button class="btn sec chico" data-act="${esc(u.uid)}" data-v="${u.activo ? '0' : '1'}">${u.activo ? 'Desactivar' : 'Activar'}</button>`}</td></tr>`).join('');
   } catch (e) { $('uFilas').innerHTML = `<tr><td colspan="5"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
 }
 $('uFilas').addEventListener('change', async e => { const s = e.target.closest('[data-rol]'); if (!s) return; try { await updateDoc(doc(db, 'usuarios', s.dataset.rol), { rol: s.value }); toast('Rol actualizado.'); } catch (err) { toast(errorTexto(err), true); } });
 $('uFilas').addEventListener('click', async e => { const b = e.target.closest('[data-act]'); if (!b) return; ocupado(b, true); try { await updateDoc(doc(db, 'usuarios', b.dataset.act), { activo: b.dataset.v === '1' }); abrirUsuarios(); } catch (err) { toast(errorTexto(err), true); ocupado(b, false); } });
-$('uNuevo').addEventListener('click', () => { $('fUsr').reset(); $('uMsg').textContent = ''; opciones($('uRol'), ROLES, 'LOGISTICA'); $('dUsr').showModal(); });
+$('uNuevo').addEventListener('click', () => { $('fUsr').reset(); $('uMsg').textContent = ''; $('uRol').innerHTML = ROLES.map(r => `<option value="${r}"${r === 'LOGISTICA' ? ' selected' : ''}>${rolTxt(r)}</option>`).join(''); $('dUsr').showModal(); });
 $('uCerrar').addEventListener('click', () => $('dUsr').close());
 $('fUsr').addEventListener('submit', async e => {
   e.preventDefault();

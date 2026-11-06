@@ -104,7 +104,7 @@ $('fSol').addEventListener('submit', async e => {
       localStorage.setItem('solicitud-datos', JSON.stringify({ centro, nombre }));
     } catch (e2) { }
     $('sOk').hidden = false;
-    $('sOk').innerHTML = `<b>${hechos.map(h => `Solicitud N.º ${h.numero} (${h.tipo === 'LIMPIEZA' ? 'limpieza' : 'escritorio'})`).join(' y ')} enviada${hechos.length > 1 ? 's' : ''}.</b> Logística ya la${hechos.length > 1 ? 's' : ''} puede ver. Guarda ${hechos.length > 1 ? 'estos números' : 'este número'} para cualquier consulta.`;
+    $('sOk').innerHTML = `<b>${hechos.map(h => `Solicitud N.º ${h.numero} (${h.tipo === 'LIMPIEZA' ? 'limpieza' : 'escritorio'})`).join(' y ')} enviada${hechos.length > 1 ? 's' : ''}.</b> Administración ya la${hechos.length > 1 ? 's' : ''} puede ver. Guarda ${hechos.length > 1 ? 'estos números' : 'este número'} para cualquier consulta.`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   b.disabled = false; b.textContent = 'Enviar solicitud';
