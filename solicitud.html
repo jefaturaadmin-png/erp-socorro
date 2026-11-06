@@ -27,7 +27,7 @@ table{width:100%;border-collapse:collapse}
 th{background:var(--suave);font-size:12px;text-align:left;padding:7px 6px;color:#5a3a1a}
 td{padding:5px 6px;border-bottom:1px solid var(--borde);vertical-align:middle}
 td.c{text-align:center;color:var(--gris);width:28px}
-.w-cant{width:90px}.w-uni{width:90px;color:var(--gris);font-size:12.5px}
+.w-cant{width:90px}.w-uni{width:120px}
 .btn{background:var(--pri);color:#fff;border:1px solid var(--pri);border-radius:6px;padding:9px 16px;cursor:pointer;font:inherit}
 .btn:hover{background:var(--pri-osc)}
 .btn.sec{background:#fff;color:var(--pri)}
@@ -49,7 +49,7 @@ td.c{text-align:center;color:var(--gris);width:28px}
 .tipos span{flex:1;text-align:center;border:2px solid var(--borde);border-radius:8px;padding:12px;font-size:15px;font-weight:bold;color:var(--gris);background:#fff}
 .tipos input:checked+span{border-color:var(--pri);background:var(--suave);color:var(--pri)}
 .tipos input:focus-visible+span{outline:2px solid var(--pri);outline-offset:2px}
-@media (max-width:640px){.g3{grid-template-columns:1fr}.w-cant{width:70px}.w-uni{display:none}}
+@media (max-width:640px){.g3{grid-template-columns:1fr}.w-cant{width:64px}.w-uni{width:86px}td{padding:5px 3px}}
 </style>
 </head>
 <body>
@@ -71,6 +71,7 @@ td.c{text-align:center;color:var(--gris);width:28px}
     <h3>Materiales que necesitas</h3>
     <table><thead><tr><th>#</th><th>Descripción del material</th><th class="w-cant">Cantidad</th><th class="w-uni">Unidad</th><th></th></tr></thead><tbody id="sItems"></tbody></table>
     <datalist id="dlCat"></datalist>
+    <datalist id="dlUni"><option value="UND"><option value="PAQUETE"><option value="CAJA"><option value="ROLLO"><option value="BOLSA"><option value="DOCENA"><option value="CIENTO"><option value="MILLAR"><option value="PAR"><option value="JUEGO"><option value="FRASCO"><option value="BOTELLA"><option value="GALÓN"><option value="LITRO"><option value="KG"><option value="METRO"></datalist>
     <div><button type="button" class="btn sec" id="sAdd">+ Agregar material</button></div>
     <label>Comentario (opcional)<input id="sNota" maxlength="200" placeholder="Ej.: plumón delgado, vasos pequeños"></label>
     <div class="aviso error" id="sMsg" hidden></div>
@@ -81,6 +82,6 @@ td.c{text-align:center;color:var(--gris);width:28px}
     <table><thead><tr><th>N.º</th><th>Fecha</th><th>Tipo</th><th>Sucursal</th><th>Ítems</th><th>Estado</th></tr></thead><tbody id="misFilas"></tbody></table>
   </div>
 </main>
-<script type="module" src="solicitud.js?v=2026.11.06k"></script>
+<script type="module" src="solicitud.js?v=2026.11.06l"></script>
 </body>
 </html>
