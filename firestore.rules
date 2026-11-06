@@ -83,8 +83,9 @@ service cloud.firestore {
     match /solicitudes/{id} {
       allow get: if true; // la sucursal consulta el estado de lo que envió (necesita el id)
       allow list: if activo();
-      allow create: if request.resource.data.keys().hasOnly(['numero', 'fecha', 'mes', 'centro', 'centroNombre', 'solicitante', 'nota', 'items', 'estado', 'creadoMs', 'creado'])
+      allow create: if request.resource.data.keys().hasOnly(['numero', 'tipo', 'fecha', 'mes', 'centro', 'centroNombre', 'solicitante', 'nota', 'items', 'estado', 'creadoMs', 'creado'])
         && request.resource.data.estado == 'PENDIENTE'
+        && (!('tipo' in request.resource.data) || request.resource.data.tipo in ['ESCRITORIO', 'LIMPIEZA'])
         && request.resource.data.items is list && request.resource.data.items.size() > 0 && request.resource.data.items.size() <= 40
         && request.resource.data.solicitante is string && request.resource.data.solicitante.size() > 2 && request.resource.data.solicitante.size() <= 80
         && request.resource.data.centro is string && request.resource.data.centro.size() > 0 && request.resource.data.centro.size() <= 60
