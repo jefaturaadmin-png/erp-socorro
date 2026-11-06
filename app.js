@@ -10,7 +10,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06b'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.06c'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
@@ -841,33 +841,78 @@ function pintarKardex() {
     : `<tr><td colspan="5" class="vacio">${PRODUCTOS.size ? 'Ningún producto coincide.' : 'El kardex está vacío. Los productos se crean al registrar compras en “Ingreso de materiales”.'}</td></tr>`;
   if (kSel && PRODUCTOS.has(kSel)) pintarDetKardex();
 }
-$('kProds').addEventListener('click', async e => {
-  const tr = e.target.closest('tr[data-id]'); if (!tr) return;
-  kSel = tr.dataset.id; document.querySelectorAll('#kProds tr').forEach(x => x.classList.toggle('sel', x === tr));
+$('kProds').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) elegirProdKardex(tr.dataset.id); });
+async function elegirProdKardex(id) {
+  kSel = id;
+  document.querySelectorAll('#kProds tr').forEach(x => { const s = x.dataset.id === id; x.classList.toggle('sel', s); if (s) x.scrollIntoView({ block: 'nearest' }); });
   $('kDet').innerHTML = '<div class="vacio">Cargando movimientos…</div>';
-  try { const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', kSel))); kMovs = ordenarMovs(s.docs.map(d => ({ id: d.id, ...d.data() }))); pintarDetKardex(); }
+  try { const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', id))); if (kSel !== id) return; kMovs = ordenarMovs(s.docs.map(d => ({ id: d.id, ...d.data() }))); pintarDetKardex(); }
   catch (err) { $('kDet').innerHTML = `<div class="aviso error">${esc(errorTexto(err))}</div>`; }
-});
+}
 function nombreCC(t) {
   const c = String(t || '').trim(); const x = (LISTAS.codigosCC || []).find(k => k.codigo === c);
   return x && x.nombre ? `${c} · ${x.nombre}` : c;
 }
 const esEntrada = m => m.tipo === 'ENTRADA' || m.origen === 'AJUSTE+' || m.origen === 'SALDO INICIAL';
 const ordenarMovs = l => l.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || a.ms - b.ms);
+// Tarjeta kardex: filtros por periodo y tipo de movimiento, y navegación entre materiales
+const KF = { per: '', tipo: '' };
+const listaKardex = () => [...$('kProds').querySelectorAll('tr[data-id]')].map(tr => tr.dataset.id);
 function pintarDetKardex() {
   const p = PRODUCTOS.get(kSel); if (!p) return;
-  const adm = YO.rol === 'ADMIN';
-  $('kDet').innerHTML = `<div class="cab"><div><h3 style="margin:0">${esc(p.nombre)}</h3><p class="nota">${esc(p.codigo)} · ${esc(p.unidad)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</p></div>
-      <div class="acc">${adm ? '<button class="btn sec chico" type="button" id="kEdProd">Editar producto</button><button class="btn sec chico" type="button" id="kAddMov">+ Agregar movimiento</button><button class="btn sec chico" type="button" id="kRecalc" title="Vuelve a calcular saldos y costo promedio en orden de fecha">Recalcular</button>' : ''}<button class="btn sec chico" type="button" id="kCsvMov">Exportar este kardex</button></div></div>
-    <div class="ficha"><div>Stock<b>${nq(p.stock)}</b></div><div>Costo promedio<b>S/ ${n2(p.cProm)}</b></div><div>Valor<b>S/ ${n2(p.valor)}</b></div><div>Movimientos<b>${kMovs.length}</b></div>${(() => {
-      const compras = kMovs.filter(m => m.tipo === 'ENTRADA' && m.origen === 'COMPRA' && m.cu > 0); if (!compras.length) return '';
-      const ult = compras[compras.length - 1], cus = compras.map(m => m.cu);
-      return `<div>Último precio de compra<b>S/ ${n2(ult.cu)}</b><small class="nota">${fmtF(ult.fecha)} · ${esc(ult.documento || '')}${ult.tercero ? ' · ' + esc(ult.tercero) : ''}</small></div><div>Precio mín. / máx.<b>S/ ${n2(Math.min(...cus))} / ${n2(Math.max(...cus))}</b><small class="nota">${compras.length} compras</small></div>`;
-    })()}</div>
-    <div class="tabla"><table><thead><tr><th>Fecha</th><th>Mov.</th><th>Documento</th><th>Proveedor / destino</th><th class="num">Entrada</th><th class="num">Salida</th><th class="num">Saldo</th><th class="num">C. unit</th><th class="num">C. total</th><th class="num">C. prom.</th><th class="num">Saldo S/</th>${adm ? '<th></th>' : ''}</tr></thead>
-    <tbody>${kMovs.length ? kMovs.map(m => { const ent = esEntrada(m); const t = m.tipo === 'AJUSTE' ? 'AJUSTE' : m.tipo; const etq = m.origen === 'ANULACION' ? 'ANULA' : m.origen === 'SALDO INICIAL' ? 'SALDO INICIAL' : m.tipo === 'AJUSTE' ? m.origen : m.tipo;
-      return `<tr${m.saldoCant < -1e-9 ? ' style="background:var(--rojo-f)"' : ''}><td>${fmtF(m.fecha)}</td><td><span class="pill ${t}">${esc(etq)}</span></td><td>${m.comprobanteId ? `<a href="#" data-comp="${esc(m.comprobanteId)}" title="Ver la factura">${esc(m.documento)}</a>` : esc(m.documento)}${m.lote ? `<br><small class="nota">Lote ${esc(m.lote)}${m.vence ? ' · vence ' + fmtF(m.vence) : ''}</small>` : ''}</td><td>${esc(nombreCC(m.tercero))}${m.persona ? `<br><small class="nota">${esc(m.persona)}</small>` : ''}</td><td class="num">${ent ? nq(m.cant) : ''}</td><td class="num">${ent ? '' : nq(m.cant)}</td><td class="num"><b>${nq(m.saldoCant)}</b></td><td class="num">${n2(m.cu)}</td><td class="num">${n2(m.ct)}</td><td class="num">${n2(m.cProm)}</td><td class="num">${n2(m.saldoValor)}</td>${adm ? `<td><div class="acciones"><button class="btn sec chico" data-ed="${esc(m.id)}">Editar</button><button class="btn peligro chico" data-del="${esc(m.id)}" aria-label="Eliminar movimiento">×</button></div></td>` : ''}</tr>`; }).join('') : `<tr><td colspan="12" class="vacio">Sin movimientos.</td></tr>`}</tbody></table></div>`;
-  $('kCsvMov').addEventListener('click', () => descargarCSV(`kardex_${p.codigo}.csv`, filasKardex(kMovs)));
+  const adm = YO.rol === 'ADMIN', u = esc(p.unidad || '');
+  const meses = [...new Set(kMovs.map(m => (m.fecha || '').slice(0, 7)).filter(Boolean))].sort().reverse();
+  if (KF.per && !meses.includes(KF.per)) KF.per = '';
+  // inventario antes de cada movimiento = saldo del movimiento anterior
+  const filas = kMovs.map((m, i) => ({ m, ini: i ? kMovs[i - 1].saldoCant : 0, iniVal: i ? kMovs[i - 1].saldoValor : 0, ent: esEntrada(m) }));
+  const enPer = filas.filter(f => !KF.per || (f.m.fecha || '').startsWith(KF.per));
+  const vis = enPer.filter(f => !KF.tipo || (KF.tipo === 'E' ? f.ent : !f.ent));
+  const antes = KF.per ? filas.filter(f => (f.m.fecha || '') < KF.per) : [];
+  const saldoIni = antes.length ? antes[antes.length - 1].m : null;
+  const cierre = enPer.length ? enPer[enPer.length - 1].m : (saldoIni || { saldoCant: 0, saldoValor: 0 });
+  const totE = r4(enPer.filter(f => f.ent).reduce((a, f) => a + f.m.cant, 0)), totS = r4(enPer.filter(f => !f.ent).reduce((a, f) => a + f.m.cant, 0));
+  const compras = kMovs.filter(m => m.tipo === 'ENTRADA' && m.origen === 'COMPRA' && m.cu > 0), ult = compras[compras.length - 1], cus = compras.map(m => m.cu);
+  const lista = listaKardex(), pos = lista.indexOf(p.id);
+  const etq = m => m.origen === 'ANULACION' ? 'ANULA' : m.origen === 'SALDO INICIAL' ? 'SALDO INICIAL' : m.tipo === 'AJUSTE' ? m.origen : m.tipo === 'ENTRADA' ? 'COMPRA' : 'SALIDA';
+  const docu = m => m.comprobanteId ? `<a href="#" data-comp="${esc(m.comprobanteId)}" title="Ver la factura">${esc(m.documento)}</a>` : esc(m.documento || '');
+  $('kDet').innerHTML = `<div class="tk">
+    <div class="tk-cab">
+      <button type="button" class="tk-nav" data-nav="-1"${pos <= 0 ? ' disabled' : ''} aria-label="Material anterior" title="Material anterior">‹</button>
+      <h3>TARJETA KARDEX</h3>
+      <div class="tk-num">N.º <b>${esc(p.codigo)}</b></div>
+      <button type="button" class="tk-nav" data-nav="1"${pos < 0 || pos >= lista.length - 1 ? ' disabled' : ''} aria-label="Material siguiente" title="Material siguiente">›</button>
+    </div>
+    <div class="tk-datos">
+      <div class="tk-f"><span>Artículo</span><b>${esc(p.nombre)}</b></div>
+      <div class="tk-f"><span>Referencia</span><b>${esc(p.codigo)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</b></div>
+      <div class="tk-f"><span>Proveedor</span><b>${ult?.tercero ? esc(ult.tercero) : '—'}</b></div>
+      <div class="tk-f"><span>Periodo</span><select id="kPer" aria-label="Periodo"><option value="">Todo el historial</option>${meses.map(m => `<option value="${m}"${m === KF.per ? ' selected' : ''}>${esc(nombreMes(m))}</option>`).join('')}</select></div>
+      <div class="tk-f tk-saldo"><span>Saldos${KF.per ? ' al cierre' : ''}</span><b>${nq(cierre.saldoCant)} ${u}</b><b>S/ ${n2(cierre.saldoValor)}</b></div>
+      <div class="tk-f"><span>Costo promedio</span><b>S/ ${n2(KF.per ? cierre.cProm : p.cProm)}</b>${ult ? `<small>Última compra S/ ${n2(ult.cu)} (${fmtF(ult.fecha)}) · mín. ${n2(Math.min(...cus))} · máx. ${n2(Math.max(...cus))}</small>` : ''}</div>
+    </div>
+    <div class="tk-bar">
+      <div class="seg" role="group" aria-label="Tipo de movimiento">${[['', 'Todos'], ['E', 'Entradas'], ['S', 'Salidas']].map(([v, t]) => `<button type="button" data-tipo="${v}" class="${KF.tipo === v ? 'act' : ''}">${t}</button>`).join('')}</div>
+      <span class="nota">${KF.per ? esc(nombreMes(KF.per)) + ': ' : ''}entraron <b style="color:var(--ok)">${nq(totE)}</b> · salieron <b style="color:var(--rojo)">${nq(totS)}</b> ${u}</span>
+      <div class="acc">${adm ? '<button class="btn sec chico" type="button" id="kEdProd">Editar producto</button><button class="btn sec chico" type="button" id="kAddMov">+ Movimiento</button><button class="btn sec chico" type="button" id="kRecalc" title="Vuelve a calcular saldos y costo promedio en orden de fecha">Recalcular</button>' : ''}<button class="btn sec chico" type="button" id="kCsvMov">Exportar</button></div>
+    </div>
+    <div class="tabla"><table class="tk-tab">
+      <thead><tr><th rowspan="2">Fecha</th><th rowspan="2">Documento / Descripción</th><th rowspan="2">Proveedor / destino</th><th colspan="5" class="tk-grupo">UNIDADES</th><th colspan="2" class="tk-grupo">VALORES (S/)</th>${adm ? '<th rowspan="2"></th>' : ''}</tr>
+        <tr><th class="num">Inv. inicial</th><th class="num">Costo unit.</th><th class="num">Entrada</th><th class="num">Salida</th><th class="num">Inv. final</th><th class="num">Costo total</th><th class="num">Saldo</th></tr></thead>
+      <tbody>${saldoIni && !KF.tipo ? `<tr class="tk-ant"><td>${fmtF(saldoIni.fecha)}</td><td colspan="6"><i>Saldo anterior al periodo</i></td><td class="num"><b>${nq(saldoIni.saldoCant)}</b></td><td></td><td class="num">${n2(saldoIni.saldoValor)}</td>${adm ? '<td></td>' : ''}</tr>` : ''}
+      ${vis.length ? vis.map(({ m, ini, ent }) => `<tr class="${ent ? 'tk-e' : 'tk-s'}${m.saldoCant < -1e-9 ? ' tk-neg' : ''}" title="${esc(`Registró: ${m.usuario || ''} · C. prom. después: S/ ${n2(m.cProm)}`)}">
+        <td>${fmtF(m.fecha)}</td>
+        <td><span class="pill ${m.tipo === 'AJUSTE' ? 'AJUSTE' : m.tipo}">${esc(etq(m))}</span> ${docu(m)}${m.lote ? `<br><small class="nota">Lote ${esc(m.lote)}${m.vence ? ' · vence ' + fmtF(m.vence) : ''}</small>` : ''}</td>
+        <td>${esc(nombreCC(m.tercero))}${m.persona ? `<br><small class="nota">${esc(m.persona)}</small>` : ''}</td>
+        <td class="num">${nq(ini)}</td><td class="num">${n2(m.cu)}</td>
+        <td class="num tk-ent">${ent ? nq(m.cant) : ''}</td><td class="num tk-sal">${ent ? '' : nq(m.cant)}</td>
+        <td class="num"><b>${nq(m.saldoCant)}</b></td><td class="num">${n2(m.ct)}</td><td class="num">${n2(m.saldoValor)}</td>
+        ${adm ? `<td class="tk-acc"><button type="button" class="tk-ic" data-ed="${esc(m.id)}" title="Editar movimiento" aria-label="Editar movimiento">✎</button><button type="button" class="tk-ic peligro" data-del="${esc(m.id)}" title="Eliminar movimiento" aria-label="Eliminar movimiento">×</button></td>` : ''}</tr>`).join('') : `<tr><td colspan="${adm ? 11 : 10}" class="vacio">Sin movimientos${KF.per || KF.tipo ? ' con este filtro' : ''}.</td></tr>`}</tbody>
+      ${enPer.length ? `<tfoot><tr><td colspan="5"><b>Totales${KF.per ? ' del periodo' : ''}</b></td><td class="num tk-ent"><b>${nq(totE)}</b></td><td class="num tk-sal"><b>${nq(totS)}</b></td><td class="num"><b>${nq(cierre.saldoCant)}</b></td><td></td><td class="num"><b>${n2(cierre.saldoValor)}</b></td>${adm ? '<td></td>' : ''}</tr></tfoot>` : ''}
+    </table></div></div>`;
+  $('kCsvMov').addEventListener('click', () => descargarCSV(`kardex_${p.codigo}${KF.per ? '_' + KF.per : ''}.csv`, filasKardex(vis.map(f => f.m))));
+  $('kPer').addEventListener('change', e => { KF.per = e.target.value; pintarDetKardex(); });
+  $('kDet').querySelectorAll('[data-tipo]').forEach(b => b.addEventListener('click', () => { KF.tipo = b.dataset.tipo; pintarDetKardex(); }));
+  $('kDet').querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => { const l = listaKardex(), i = l.indexOf(p.id) + Number(b.dataset.nav); if (l[i]) elegirProdKardex(l[i]); }));
   if (adm) {
     $('kEdProd').addEventListener('click', () => abrirEdProd(p));
     $('kAddMov').addEventListener('click', () => abrirEdMov(null));
