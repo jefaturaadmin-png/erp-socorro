@@ -10,6 +10,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
+const VERSION = '2026.11.06b'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
@@ -209,7 +210,7 @@ function armarMenu() {
     if (m.grupo !== grupo) { grupo = m.grupo; h += `<div class="grupo">${esc(grupo)}</div>`; }
     h += `<button type="button" data-mod="${m.id}">${esc(m.nombre)}</button>`;
   });
-  $('menu').innerHTML = h;
+  $('menu').innerHTML = h + `<div class="nota" style="padding:16px 12px 8px;font-size:11px">Versión ${VERSION}</div>`;
 }
 $('menu').addEventListener('click', e => { const b = e.target.closest('[data-mod]'); if (b) irA(b.dataset.mod); });
 function irA(id) {
