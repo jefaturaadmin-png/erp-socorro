@@ -3,6 +3,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getFirestore, doc, getDoc, collection, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
+import { CENTROS_COSTO } from './centros.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -39,6 +40,8 @@ async function iniciar() {
     const s = await getDoc(doc(db, 'publico', 'catalogo'));
     const d = s.exists() ? s.data() : {};
     CAT = d.items || []; CENTROS = d.centros || [];
+    // Si el catálogo todavía no tiene los centros de costo oficiales (código · sucursal), se usan los del sistema
+    if (CENTROS.filter(c => /^\d+$/.test(c.v) && c.t !== c.v).length < 2) CENTROS = CENTROS_COSTO.map(c => ({ v: c.codigo, t: `${c.codigo} · ${c.nombre}` }));
   } catch (e) { $('carga').className = 'aviso error'; $('carga').textContent = 'No se pudo conectar. Revisa tu internet y vuelve a cargar la página.'; return; }
   $('sCentro').innerHTML = '<option value="">— Elegir —</option>' + CENTROS.map(c => `<option value="${esc(c.v)}">${esc(c.t)}</option>`).join('');
   const pedido = new URLSearchParams(location.search).get('tipo');

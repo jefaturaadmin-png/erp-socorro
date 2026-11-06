@@ -4,13 +4,14 @@ import { initializeApp, deleteApp } from 'https://www.gstatic.com/firebasejs/10.
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
+import { CENTROS_COSTO } from './centros.js';
 
 /* ================= Configuración fija ================= */
 const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nombre de usuario
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06j'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.06k'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
@@ -50,28 +51,6 @@ const DESC_ROL = {
   CONSULTA: 'Solo mira servicios, compras y kardex'
 };
 const TIPOS_DOC = ['FACTURA', 'BOLETA', 'RECIBO POR HONORARIOS', 'NOTA DE CREDITO', 'NOTA DE DEBITO', 'TICKET', 'OTRO'];
-const CENTROS_COSTO = [
-  { codigo: '101', nombre: 'FARMACIA SOCORRO REAL' },
-  { codigo: '102', nombre: 'FARMACIA SOCORRO 2' },
-  { codigo: '103', nombre: 'FARMACIA SOCORRO HUANCAS' },
-  { codigo: '104', nombre: 'FARMACIA SOCORRO LOS HEROES' },
-  { codigo: '105', nombre: 'FARMACIA SOCORRO MERCADO' },
-  { codigo: '106', nombre: 'FARMACIA SOCORRO ORTEGA' },
-  { codigo: '107', nombre: 'FARMACIA SOCORRO PARRA' },
-  { codigo: '108', nombre: 'FARMACIA SOCORRO SUMAR' },
-  { codigo: '109', nombre: 'FARMACIA SOCORRO TUPAC' },
-  { codigo: '110', nombre: 'FS CONCEPCION' },
-  { codigo: '111', nombre: 'SOCORRO BEAUTY' },
-  { codigo: '112', nombre: 'SOCORRO HUANUCO' },
-  { codigo: '113', nombre: 'SOCORRO LIBERTAD' },
-  { codigo: '114', nombre: 'SOCORRO MERCADO TAMBO' },
-  { codigo: '115', nombre: 'SOCORRO PIOPATA' },
-  { codigo: '116', nombre: 'SOCORRO PARRA REAL' },
-  { codigo: '117', nombre: 'CENTENARIO / WESTERN' },
-  { codigo: '118', nombre: 'DROGUERIA' },
-  { codigo: '119', nombre: 'ADMINISTRATIVO' },
-  { codigo: '120', nombre: 'ANDALUZ' }
-];
 const DEF_LISTAS = {
   empresas: [{ nombre: 'FS SOCORRO S.A.C.', ruc: '20486562341' }, { nombre: 'FS INNOVA SOCORRO', ruc: '' }, { nombre: 'HEALTH PREVENTIVE', ruc: '' }],
   areas: ['ADMINISTRACIÓN', 'LOGÍSTICA', 'DROGUERÍA FS', 'REAL', 'MERCADO', 'TUPAC', 'ORTEGA', 'HUANCAS', 'HEROES', 'MCDO. TAMBO', 'PARRA', 'SUMAR', 'PUNO', 'PIOPATA', 'CONCEPCIÓN', 'LIBERTAD', 'ANDALUZ'],
