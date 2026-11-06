@@ -10,13 +10,14 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06c'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.06d'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
   { id: 'inicio', nombre: 'Inicio', grupo: 'General' },
   { id: 'servicios', nombre: 'Ingreso de servicios', grupo: 'Logística' },
   { id: 'compras', nombre: 'Ingreso de materiales', grupo: 'Logística' },
+  { id: 'salidas', nombre: 'Salida de materiales', grupo: 'Logística' },
   { id: 'kardex', nombre: 'Kardex', grupo: 'Logística' },
   { id: 'rrhh', nombre: 'Personal', grupo: 'RR. HH.' },
   { id: 'cargo', nombre: 'Cargo de útiles', grupo: 'RR. HH.' },
@@ -25,12 +26,12 @@ const MODULOS = [
 ];
 const ACCESO = {
   ADMIN: MODULOS.map(m => m.id),
-  LOGISTICA: ['inicio', 'servicios', 'compras', 'kardex', 'cargo'],
-  COMPRAS: ['inicio', 'servicios', 'compras', 'kardex'],
-  ALMACEN: ['inicio', 'compras', 'kardex'],
+  LOGISTICA: ['inicio', 'servicios', 'compras', 'salidas', 'kardex', 'cargo'],
+  COMPRAS: ['inicio', 'servicios', 'compras', 'salidas', 'kardex'],
+  ALMACEN: ['inicio', 'compras', 'salidas', 'kardex'],
   RRHH: ['inicio', 'rrhh', 'cargo'],
-  GERENCIA: ['inicio', 'servicios', 'compras', 'kardex', 'rrhh', 'cargo'],
-  CONSULTA: ['inicio', 'servicios', 'compras', 'kardex']
+  GERENCIA: ['inicio', 'servicios', 'compras', 'salidas', 'kardex', 'rrhh', 'cargo'],
+  CONSULTA: ['inicio', 'servicios', 'compras', 'salidas', 'kardex']
 };
 const PERMISO = {
   comprobantes: ['ADMIN', 'LOGISTICA', 'COMPRAS'],
@@ -42,7 +43,7 @@ const DESC_ROL = {
   ADMIN: 'Todo, incluidos usuarios y configuración',
   LOGISTICA: 'Registra servicios y compras, mueve el kardex, imprime cargos',
   COMPRAS: 'Registra servicios y compras, mueve el kardex',
-  ALMACEN: 'Ve compras y registra salidas y ajustes del kardex',
+  ALMACEN: 'Ve compras y registra salidas de materiales',
   RRHH: 'Registra personal e imprime cargos de útiles',
   GERENCIA: 'Ve todo y aprueba o rechaza comprobantes',
   CONSULTA: 'Solo mira servicios, compras y kardex'
@@ -219,7 +220,7 @@ function irA(id) {
   document.querySelectorAll('.mod').forEach(s => s.hidden = s.id !== 'm-' + id);
   document.querySelectorAll('#menu [data-mod]').forEach(b => b.classList.toggle('act', b.dataset.mod === id));
   history.replaceState(null, '', '#' + id);
-  ({ inicio: abrirInicio, servicios: () => abrirComps('SERVICIO'), compras: () => abrirComps('COMPRA'), kardex: abrirKardex, rrhh: abrirRRHH, cargo: abrirCargo, usuarios: abrirUsuarios, config: abrirConfig })[id]();
+  ({ inicio: abrirInicio, servicios: () => abrirComps('SERVICIO'), compras: () => abrirComps('COMPRA'), salidas: abrirSalidas, kardex: abrirKardex, rrhh: abrirRRHH, cargo: abrirCargo, usuarios: abrirUsuarios, config: abrirConfig })[id]();
 }
 
 /* ================= Inicio ================= */
@@ -826,24 +827,21 @@ async function anularComp(c) {
 
 /* ================= Kardex ================= */
 let kSel = null, kMovs = [];
-function abrirKardex() {
-  $('kMov').hidden = !puede('kardex'); $('kImp').hidden = $('kDeshacer').hidden = true; // se importa desde Ingreso de materiales
-  pintarKardex();
-}
+// El kardex es solo de consulta: primero la lista de materiales; al elegir uno se muestra su tarjeta
+function abrirKardex() { verListaKardex(); pintarKardex(); }
+function verListaKardex() { kSel = null; $('kVista').hidden = true; $('kLista').hidden = false; }
+$('kVolver').addEventListener('click', () => { const id = kSel; verListaKardex(); pintarKardex(); const tr = id && $('kProds').querySelector(`tr[data-id="${CSS.escape(id)}"]`); if (tr) tr.scrollIntoView({ block: 'center' }); });
 $('kBuscar').addEventListener('input', pintarKardex);
 function pintarKardex() {
   const q = norm($('kBuscar').value);
   const l = [...PRODUCTOS.values()].filter(p => !q || norm(p.codigo + ' ' + p.nombre).includes(q)).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-  let val = 0, conStock = 0; PRODUCTOS.forEach(p => { val += p.valor || 0; if (p.stock > 0) conStock++; });
-  $('kTarjetas').innerHTML = [['Productos', PRODUCTOS.size, conStock + ' con stock'], ['Valor del inventario', 'S/ ' + n2(val), 'costo promedio sin IGV']]
-    .map(t => `<div class="tarjeta"><div class="k">${t[0]}</div><div class="v">${t[1]}</div><div class="s">${t[2]}</div></div>`).join('');
-  $('kProds').innerHTML = l.length ? l.map(p => `<tr data-id="${esc(p.id)}" class="${p.id === kSel ? 'sel' : ''}" style="cursor:pointer"><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}<br><small class="nota">${esc(p.unidad)}</small></td><td class="num">${nq(p.stock)}</td><td class="num">${n2(p.cProm)}</td><td class="num">${n2(p.valor)}</td></tr>`).join('')
-    : `<tr><td colspan="5" class="vacio">${PRODUCTOS.size ? 'Ningún producto coincide.' : 'El kardex está vacío. Los productos se crean al registrar compras en “Ingreso de materiales”.'}</td></tr>`;
+  $('kProds').innerHTML = l.length ? l.map(p => `<tr data-id="${esc(p.id)}" class="${p.id === kSel ? 'sel' : ''}"><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}<br><small class="nota">${esc(p.unidad)}</small></td><td class="num">${nq(p.stock)}</td><td class="num">${n2(p.valor)}</td></tr>`).join('')
+    : `<tr><td colspan="4" class="vacio">${PRODUCTOS.size ? 'Ningún producto coincide.' : 'El kardex está vacío. Los productos se crean al registrar compras en “Ingreso de materiales”.'}</td></tr>`;
   if (kSel && PRODUCTOS.has(kSel)) pintarDetKardex();
 }
 $('kProds').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) elegirProdKardex(tr.dataset.id); });
 async function elegirProdKardex(id) {
-  kSel = id;
+  kSel = id; $('kLista').hidden = true; $('kVista').hidden = false; window.scrollTo(0, 0);
   document.querySelectorAll('#kProds tr').forEach(x => { const s = x.dataset.id === id; x.classList.toggle('sel', s); if (s) x.scrollIntoView({ block: 'nearest' }); });
   $('kDet').innerHTML = '<div class="vacio">Cargando movimientos…</div>';
   try { const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', id))); if (kSel !== id) return; kMovs = ordenarMovs(s.docs.map(d => ({ id: d.id, ...d.data() }))); pintarDetKardex(); }
@@ -860,7 +858,7 @@ const KF = { per: '', tipo: '' };
 const listaKardex = () => [...$('kProds').querySelectorAll('tr[data-id]')].map(tr => tr.dataset.id);
 function pintarDetKardex() {
   const p = PRODUCTOS.get(kSel); if (!p) return;
-  const adm = YO.rol === 'ADMIN', u = esc(p.unidad || '');
+  const adm = false, u = esc(p.unidad || ''); // la tarjeta es solo de consulta
   const meses = [...new Set(kMovs.map(m => (m.fecha || '').slice(0, 7)).filter(Boolean))].sort().reverse();
   if (KF.per && !meses.includes(KF.per)) KF.per = '';
   // inventario antes de cada movimiento = saldo del movimiento anterior
@@ -893,7 +891,7 @@ function pintarDetKardex() {
     <div class="tk-bar">
       <div class="seg" role="group" aria-label="Tipo de movimiento">${[['', 'Todos'], ['E', 'Entradas'], ['S', 'Salidas']].map(([v, t]) => `<button type="button" data-tipo="${v}" class="${KF.tipo === v ? 'act' : ''}">${t}</button>`).join('')}</div>
       <span class="nota">${KF.per ? esc(nombreMes(KF.per)) + ': ' : ''}entraron <b style="color:var(--ok)">${nq(totE)}</b> · salieron <b style="color:var(--rojo)">${nq(totS)}</b> ${u}</span>
-      <div class="acc">${adm ? '<button class="btn sec chico" type="button" id="kEdProd">Editar producto</button><button class="btn sec chico" type="button" id="kAddMov">+ Movimiento</button><button class="btn sec chico" type="button" id="kRecalc" title="Vuelve a calcular saldos y costo promedio en orden de fecha">Recalcular</button>' : ''}<button class="btn sec chico" type="button" id="kCsvMov">Exportar</button></div>
+      <div class="acc"><button class="btn sec chico" type="button" id="kCsvMov">Exportar</button></div>
     </div>
     <div class="tabla"><table class="tk-tab">
       <thead><tr><th rowspan="2">Fecha</th><th rowspan="2">Documento / Descripción</th><th rowspan="2">Proveedor / destino</th><th colspan="5" class="tk-grupo">UNIDADES</th><th colspan="2" class="tk-grupo">VALORES (S/)</th>${adm ? '<th rowspan="2"></th>' : ''}</tr>
@@ -913,11 +911,6 @@ function pintarDetKardex() {
   $('kPer').addEventListener('change', e => { KF.per = e.target.value; pintarDetKardex(); });
   $('kDet').querySelectorAll('[data-tipo]').forEach(b => b.addEventListener('click', () => { KF.tipo = b.dataset.tipo; pintarDetKardex(); }));
   $('kDet').querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => { const l = listaKardex(), i = l.indexOf(p.id) + Number(b.dataset.nav); if (l[i]) elegirProdKardex(l[i]); }));
-  if (adm) {
-    $('kEdProd').addEventListener('click', () => abrirEdProd(p));
-    $('kAddMov').addEventListener('click', () => abrirEdMov(null));
-    $('kRecalc').addEventListener('click', async e => { ocupado(e.currentTarget, true, 'Recalculando…'); try { await recalcularProducto(p.id); toast('Kardex recalculado.'); } catch (err) { toast(errorTexto(err), true); } });
-  }
 }
 $('kDet').addEventListener('click', async e => {
   const ed = e.target.closest('[data-ed]'), del = e.target.closest('[data-del]'), comp = e.target.closest('[data-comp]');
@@ -1351,11 +1344,53 @@ $('impOk').addEventListener('click', async () => {
   ocupado(b, false);
 });
 
+/* ================= Salida de materiales (módulo aparte; el kardex solo se consulta) ================= */
+const SAL = { lista: [] };
+function abrirSalidas() {
+  $('sNueva').hidden = !puede('kardex');
+  if (!$('sMes').value) $('sMes').value = mesISO();
+  cargarSalidas();
+}
+async function cargarSalidas() {
+  const mes = $('sMes').value || mesISO();
+  $('sFilas').innerHTML = '<tr><td colspan="10" class="vacio">Cargando…</td></tr>';
+  try {
+    const s = await getDocs(query(collection(db, 'movimientos'), where('fecha', '>=', mes + '-01'), where('fecha', '<=', mes + '-31')));
+    SAL.lista = s.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(m => (m.tipo === 'SALIDA' && m.origen !== 'ANULACION') || (m.tipo === 'AJUSTE' && m.origen !== 'SALDO INICIAL'))
+      .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.ms || 0) - (a.ms || 0));
+    pintarSalidas();
+  } catch (e) { $('sFilas').innerHTML = `<tr><td colspan="10"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
+}
+function filtrarSalidas() {
+  const t = $('sTipo').value, q = norm($('sBuscar').value);
+  return SAL.lista.filter(m => (!t || m.tipo === t) && (!q || norm([m.codigo, m.producto, nombreCC(m.tercero), m.persona, m.documento].join(' ')).includes(q)));
+}
+function pintarSalidas() {
+  const l = filtrarSalidas(), adm = YO.rol === 'ADMIN';
+  const tot = r2(l.filter(m => m.tipo === 'SALIDA').reduce((a, m) => a + (m.ct || 0), 0));
+  $('sRes').innerHTML = `<span><b>${l.length}</b> movimientos</span><span>Costo de lo entregado: <b>S/ ${n2(tot)}</b></span>`;
+  $('sFilas').innerHTML = l.length ? l.map(m => `<tr><td>${fmtF(m.fecha)}</td><td>${esc(m.codigo)}</td><td>${esc(m.producto)}${m.tipo === 'AJUSTE' ? ` <span class="pill AJUSTE">${esc(m.origen)}</span>` : ''}</td>
+      <td class="num"><b>${nq(m.cant)}</b> <small class="nota">${esc(m.unidad || '')}</small></td><td>${esc(nombreCC(m.tercero))}</td><td>${esc(m.persona || '')}</td><td>${esc(m.documento || '')}</td>
+      <td class="num">${n2(m.ct)}</td><td><small>${esc(m.usuario || '')}</small></td><td>${adm ? `<button class="btn peligro chico" type="button" data-sdel="${esc(m.id)}">Eliminar</button>` : ''}</td></tr>`).join('')
+    : '<tr><td colspan="10" class="vacio">No hay salidas con este filtro.</td></tr>';
+}
+$('sMes').addEventListener('change', cargarSalidas);
+['sTipo', 'sBuscar'].forEach(i => $(i).addEventListener('input', pintarSalidas));
+$('sCsv').addEventListener('click', () => descargarCSV(`salidas_${$('sMes').value}.csv`, filasKardex(filtrarSalidas())));
+$('sFilas').addEventListener('click', async e => {
+  const b = e.target.closest('[data-sdel]'); if (!b) return;
+  const m = SAL.lista.find(x => x.id === b.dataset.sdel); if (!m) return;
+  if (!confirm(`¿Eliminar esta salida?\n${fmtF(m.fecha)} · ${m.producto} · ${nq(m.cant)} ${m.unidad || ''} · ${nombreCC(m.tercero)}\n\nEl stock y el kardex se recalculan solos.`)) return;
+  ocupado(b, true);
+  try { await deleteDoc(doc(db, 'movimientos', m.id)); await recalcularProducto(m.productoId); toast('Salida eliminada.'); cargarSalidas(); }
+  catch (err) { toast(errorTexto(err), true); ocupado(b, false); }
+});
+
 /* Salidas y ajustes */
-$('kMov').addEventListener('click', () => {
+$('sNueva').addEventListener('click', () => {
   $('fMov').reset(); $('mFecha').value = hoyISO(); $('mMsg').textContent = ''; $('mInfo').textContent = '';
   opciones($('mDestino'), LISTAS.areas, '', '— Elegir —');
-  if (kSel && PRODUCTOS.has(kSel)) $('mProd').value = etiquetaProd(PRODUCTOS.get(kSel));
   $('mTipo').querySelectorAll('option[value^="AJUSTE"]').forEach(o => o.disabled = YO.rol !== 'ADMIN');
   infoMov(); cargarPersonalSilencioso(); $('dMov').showModal();
 });
@@ -1390,7 +1425,8 @@ $('fMov').addEventListener('submit', async e => {
         cant: q, cu, ct: r2(q * cu), saldoCant: stock, cProm, saldoValor: valor, usuario: YO.nombre, uid: YO.uid, creado: serverTimestamp()
       });
     });
-    $('dMov').close(); toast('Movimiento registrado.');
+    $('dMov').close(); toast('Salida registrada.');
+    if (modActual === 'salidas') cargarSalidas();
     if (kSel === p.id) { const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', kSel))); kMovs = ordenarMovs(s.docs.map(d => ({ id: d.id, ...d.data() }))); pintarDetKardex(); }
   } catch (err) { $('mMsg').textContent = errorTexto(err); }
   ocupado(b, false);
