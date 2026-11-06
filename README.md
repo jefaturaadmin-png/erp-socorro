@@ -12,3 +12,11 @@ Sistema web de Farmacia Socorro (GitHub Pages + Firebase).
 3. Crear Firestore Database y publicar las reglas de `firestore.rules`.
 4. Registrar una app web y pegar su configuración en `firebase-config.js`.
 5. Abrir la página: la primera vez pide crear el administrador.
+
+## Solicitudes de materiales de las sucursales
+
+Cada sucursal pide sus materiales en `solicitud.html` (la misma dirección del ERP terminada en `/solicitud.html`), **sin usuario ni contraseña**. El enlace aparece en el módulo *Solicitudes de sucursales*, con un botón para copiarlo.
+
+Logística ve las solicitudes en ese módulo, elige el material del kardex de cada línea, registra la entrega (se descuenta sola del kardex como salida) e imprime el formato de consumo.
+
+La página pública solo puede leer `publico/catalogo` (nombres de materiales y sucursales, sin stock ni costos) y crear solicitudes. Después de actualizar `firestore.rules` hay que volver a publicarlas en Firebase → Firestore Database → Reglas.

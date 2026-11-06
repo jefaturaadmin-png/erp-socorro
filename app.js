@@ -10,11 +10,12 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06h'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.06i'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
   { id: 'inicio', nombre: 'Inicio', grupo: 'General' },
+  { id: 'solicitudes', nombre: 'Solicitudes de sucursales', grupo: 'Logística' },
   { id: 'servicios', nombre: 'Ingreso de servicios', grupo: 'Logística' },
   { id: 'compras', nombre: 'Ingreso de materiales', grupo: 'Logística' },
   { id: 'salidas', nombre: 'Salida de materiales', grupo: 'Logística' },
@@ -26,12 +27,12 @@ const MODULOS = [
 ];
 const ACCESO = {
   ADMIN: MODULOS.map(m => m.id),
-  LOGISTICA: ['inicio', 'servicios', 'compras', 'salidas', 'kardex', 'cargo'],
-  COMPRAS: ['inicio', 'servicios', 'compras', 'salidas', 'kardex'],
-  ALMACEN: ['inicio', 'compras', 'salidas', 'kardex'],
+  LOGISTICA: ['inicio', 'solicitudes', 'servicios', 'compras', 'salidas', 'kardex', 'cargo'],
+  COMPRAS: ['inicio', 'solicitudes', 'servicios', 'compras', 'salidas', 'kardex'],
+  ALMACEN: ['inicio', 'solicitudes', 'compras', 'salidas', 'kardex'],
   RRHH: ['inicio', 'rrhh', 'cargo'],
-  GERENCIA: ['inicio', 'servicios', 'compras', 'salidas', 'kardex', 'rrhh', 'cargo'],
-  CONSULTA: ['inicio', 'servicios', 'compras', 'salidas', 'kardex']
+  GERENCIA: ['inicio', 'solicitudes', 'servicios', 'compras', 'salidas', 'kardex', 'rrhh', 'cargo'],
+  CONSULTA: ['inicio', 'solicitudes', 'servicios', 'compras', 'salidas', 'kardex']
 };
 const PERMISO = {
   comprobantes: ['ADMIN', 'LOGISTICA', 'COMPRAS'],
@@ -171,6 +172,7 @@ async function cargarBase() {
     PRODUCTOS.clear(); s.forEach(d => PRODUCTOS.set(d.id, { id: d.id, ...d.data() }));
     $('dlProd').innerHTML = [...PRODUCTOS.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(p => `<option value="${esc(etiquetaProd(p))}">`).join('');
     if (modActual === 'kardex') pintarKardex();
+    sincronizarCatalogo(); // nombres de materiales para la página pública de solicitudes
   }, e => console.warn('productos', e));
 }
 
@@ -220,7 +222,7 @@ function irA(id) {
   document.querySelectorAll('.mod').forEach(s => s.hidden = s.id !== 'm-' + id);
   document.querySelectorAll('#menu [data-mod]').forEach(b => b.classList.toggle('act', b.dataset.mod === id));
   history.replaceState(null, '', '#' + id);
-  ({ inicio: abrirInicio, servicios: () => abrirComps('SERVICIO'), compras: () => abrirComps('COMPRA'), salidas: abrirSalidas, kardex: abrirKardex, rrhh: abrirRRHH, cargo: abrirCargo, usuarios: abrirUsuarios, config: abrirConfig })[id]();
+  ({ inicio: abrirInicio, solicitudes: abrirSolicitudes, servicios: () => abrirComps('SERVICIO'), compras: () => abrirComps('COMPRA'), salidas: abrirSalidas, kardex: abrirKardex, rrhh: abrirRRHH, cargo: abrirCargo, usuarios: abrirUsuarios, config: abrirConfig })[id]();
 }
 
 /* ================= Inicio ================= */
@@ -1348,6 +1350,198 @@ $('impOk').addEventListener('click', async () => {
   }
   ocupado(b, false);
 });
+
+/* ================= Solicitudes de sucursales (las envían desde solicitud.html sin usuario) ================= */
+// Catálogo público que lee solicitud.html: solo nombres de materiales y de sucursales (sin stock ni costos)
+let catPublicado = null, catTimer = null;
+function centrosPublicos() {
+  const l = (LISTAS.codigosCC || []).map(c => ({ v: c.codigo, t: c.nombre ? `${c.codigo} · ${c.nombre}` : c.codigo }));
+  const nombres = new Set((LISTAS.codigosCC || []).map(c => norm(c.nombre)));
+  LISTAS.areas.forEach(a => { if (!nombres.has(norm(a))) l.push({ v: a, t: a }); });
+  return l;
+}
+function sincronizarCatalogo() {
+  if (!YO || !puede('kardex')) return;
+  clearTimeout(catTimer);
+  catTimer = setTimeout(async () => {
+    try {
+      const datos = { items: [...PRODUCTOS.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(p => ({ i: p.id, c: p.codigo, n: p.nombre, u: p.unidad || '' })), centros: centrosPublicos() };
+      const txt = JSON.stringify(datos);
+      if (catPublicado === null) { const s = await getDoc(doc(db, 'publico', 'catalogo')); catPublicado = s.exists() ? JSON.stringify({ items: s.data().items || [], centros: s.data().centros || [] }) : ''; }
+      if (txt === catPublicado) return;
+      await setDoc(doc(db, 'publico', 'catalogo'), { ...datos, actMs: Date.now() });
+      catPublicado = txt;
+    } catch (e) { console.warn('catálogo público', e); }
+  }, 2500);
+}
+const urlSolicitud = () => new URL('solicitud.html', location.href.split('#')[0]).href;
+
+const SOLS = { lista: [] };
+function abrirSolicitudes() {
+  $('solLink').innerHTML = `<b>Enlace para las sucursales</b> (no necesita usuario ni contraseña): <a href="${esc(urlSolicitud())}" target="_blank" rel="noopener">${esc(urlSolicitud())}</a> <button type="button" class="btn sec chico" id="solCopiar">Copiar enlace</button>`;
+  $('solCopiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText(urlSolicitud()); toast('Enlace copiado. Envíalo a las sucursales.'); } catch (e) { prompt('Copia este enlace:', urlSolicitud()); } });
+  sincronizarCatalogo();
+  cargarSolicitudes();
+}
+async function cargarSolicitudes() {
+  const est = $('solEstado').value; let mes = $('solMes').value;
+  if (!est && !mes) { mes = mesISO(); $('solMes').value = mes; }
+  $('solFilas').innerHTML = '<tr><td colspan="7" class="vacio">Cargando…</td></tr>';
+  try {
+    const q = est ? query(collection(db, 'solicitudes'), where('estado', '==', est)) : query(collection(db, 'solicitudes'), where('mes', '==', mes));
+    const s = await getDocs(q);
+    SOLS.lista = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !mes || x.mes === mes).sort((a, b) => (b.numero || 0) - (a.numero || 0));
+    pintarSolicitudes();
+  } catch (e) { $('solFilas').innerHTML = `<tr><td colspan="7"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
+}
+const estSol = e => e === 'ATENDIDA' ? 'ENTREGADA' : e;
+function filtrarSolicitudes() {
+  const q = norm($('solBuscar').value);
+  return SOLS.lista.filter(x => !q || norm([x.numero, x.centroNombre, x.solicitante, ...(x.items || []).map(i => i.desc)].join(' ')).includes(q));
+}
+function pintarSolicitudes() {
+  const l = filtrarSolicitudes(), op = puede('kardex');
+  $('solRes').innerHTML = `<span><b>${l.length}</b> solicitudes</span><span>Pendientes: <b>${l.filter(x => x.estado === 'PENDIENTE').length}</b></span>`;
+  $('solFilas').innerHTML = l.length ? l.map(x => `<tr><td><b>${x.numero}</b></td><td>${fmtF(x.fecha)}</td><td>${esc(x.centroNombre || x.centro)}</td><td>${esc(x.solicitante)}</td>
+      <td>${(x.items || []).length} material(es)<br><small class="nota">${esc((x.items || []).slice(0, 3).map(i => `${i.desc} (${nq(i.cant)})`).join(', '))}${(x.items || []).length > 3 ? '…' : ''}</small>${x.nota ? `<br><small class="nota">“${esc(x.nota)}”</small>` : ''}</td>
+      <td><span class="pill ${x.estado === 'ATENDIDA' ? 'APROBADO' : x.estado === 'RECHAZADA' ? 'RECHAZADO' : 'PENDIENTE'}">${esc(estSol(x.estado))}</span>${x.fechaEntrega ? `<br><small class="nota">${fmtF(x.fechaEntrega)}</small>` : ''}</td>
+      <td><div class="acciones">${x.estado === 'PENDIENTE' && op ? `<button class="btn chico" data-sol="${esc(x.id)}">Atender</button>` : `<button class="btn sec chico" data-sol="${esc(x.id)}">Ver</button>`}<button class="btn sec chico" data-solimp="${esc(x.id)}">Imprimir</button></div></td></tr>`).join('')
+    : '<tr><td colspan="7" class="vacio">No hay solicitudes con este filtro.</td></tr>';
+}
+$('solEstado').addEventListener('change', () => { if ($('solEstado').value === 'PENDIENTE') $('solMes').value = ''; cargarSolicitudes(); });
+$('solMes').addEventListener('change', cargarSolicitudes);
+$('solBuscar').addEventListener('input', pintarSolicitudes);
+$('solCsv').addEventListener('click', () => {
+  const f = [['N.º', 'Fecha solicitud', 'Sucursal', 'Solicitado por', 'Estado', 'Fecha entrega', 'Material pedido', 'Cant. pedida', 'Código', 'Material entregado', 'Cant. entregada', 'Costo unit.', 'Costo total', 'Recibido por', 'Entregado por']];
+  filtrarSolicitudes().forEach(x => (x.entrega || x.items || []).forEach(i => f.push([x.numero, fmtF(x.fecha), x.centroNombre || x.centro, x.solicitante, estSol(x.estado), fmtF(x.fechaEntrega), i.desc, String(i.cantSol ?? i.cant).replace('.', ','), i.codigo || '', i.producto || '', x.entrega ? String(i.cant).replace('.', ',') : '', x.entrega ? numCSV(i.cu) : '', x.entrega ? numCSV(i.ct) : '', x.recibidoPor || '', x.entregadoPor || ''])));
+  descargarCSV(`solicitudes_${$('solMes').value || 'pendientes'}.csv`, f);
+});
+$('solFilas').addEventListener('click', e => {
+  const a = e.target.closest('[data-sol]'), im = e.target.closest('[data-solimp]');
+  if (a) abrirSolicitud(SOLS.lista.find(x => x.id === a.dataset.sol));
+  if (im) imprimirSolicitud(SOLS.lista.find(x => x.id === im.dataset.solimp));
+});
+
+// Atender: cada línea se enlaza con un material del kardex y se registra la salida
+let SOL = null;
+function abrirSolicitud(x) {
+  if (!x) return;
+  const editable = x.estado === 'PENDIENTE' && puede('kardex');
+  SOL = { x, editable, lineas: (x.entrega || x.items || []).map(i => {
+    const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.producto || i.desc);
+    return { desc: i.desc, cantSol: i.cantSol ?? i.cant, unidadSol: i.unidad || '', prodId: p?.id || null, entregar: x.entrega ? i.cant : (i.cant || 0), cu: i.cu };
+  }) };
+  $('solTit').textContent = `Solicitud N.º ${x.numero} · ${x.centroNombre || x.centro}`;
+  $('solInfo').innerHTML = `Solicitado por <b>${esc(x.solicitante)}</b> el ${fmtF(x.fecha)} · Estado: <b>${esc(estSol(x.estado))}</b>${x.nota ? ` · Comentario: “${esc(x.nota)}”` : ''}${x.motivo ? ` · Motivo: ${esc(x.motivo)}` : ''}${x.atendidoPor ? ` · Registró: ${esc(x.atendidoPor)}` : ''}`;
+  $('solFEnt').value = x.fechaEntrega || hoyISO(); $('solEntPor').value = x.entregadoPor || YO.nombre; $('solRecPor').value = x.recibidoPor || x.solicitante || '';
+  ['solFEnt', 'solEntPor', 'solRecPor'].forEach(id => { $(id).disabled = !editable; });
+  $('solEntregar').hidden = $('solRechazar').hidden = !editable;
+  $('solMsg').textContent = '';
+  pintarLineasSol();
+  cargarPersonalSilencioso();
+  $('dSol').showModal();
+}
+function pintarLineasSol() {
+  const dis = SOL.editable ? '' : ' disabled'; let tot = 0;
+  $('solItems').innerHTML = SOL.lineas.map((l, i) => {
+    const p = l.prodId ? PRODUCTOS.get(l.prodId) : null, cu = SOL.editable ? (p?.cProm || 0) : (l.cu || 0), ct = r2(cu * (Number(l.entregar) || 0)); tot += ct;
+    const falta = SOL.editable && p && Number(l.entregar) > p.stock + 1e-9;
+    return `<tr data-i="${i}"><td class="c">${i + 1}</td><td>${esc(l.desc)}</td><td class="num">${nq(l.cantSol)} <small class="nota">${esc(l.unidadSol)}</small></td>
+      <td><input data-f="prod" list="dlProd" value="${p ? esc(etiquetaProd(p)) : ''}" placeholder="Elegir material del kardex"${dis} aria-label="Material del kardex para la línea ${i + 1}" style="min-width:240px"></td>
+      <td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td>
+      <td class="num"><input class="w6 num" type="number" min="0" step="any" data-f="cant" value="${l.entregar}"${dis} aria-label="Cantidad a entregar en la línea ${i + 1}"></td>
+      <td class="num">${n2(cu)}</td><td class="num">${n2(ct)}</td></tr>`;
+  }).join('');
+  $('solTotal').textContent = n2(tot);
+}
+$('solItems').addEventListener('change', e => {
+  const tr = e.target.closest('tr[data-i]'); if (!tr || !SOL?.editable) return;
+  const l = SOL.lineas[+tr.dataset.i];
+  if (e.target.dataset.f === 'prod') { const p = buscarProd(e.target.value); l.prodId = p?.id || null; if (e.target.value && !p) toast('Elige un material de la lista del kardex.', true); }
+  if (e.target.dataset.f === 'cant') l.entregar = r4(Math.max(0, num(e.target.value)));
+  pintarLineasSol();
+});
+$('solCerrar').addEventListener('click', () => $('dSol').close());
+$('solImprimir').addEventListener('click', () => { if (SOL) imprimirSolicitud(SOL.x, SOL.editable ? SOL : null); });
+$('solRechazar').addEventListener('click', async e => {
+  const motivo = prompt('Motivo del rechazo (la sucursal lo verá):'); if (motivo === null) return;
+  const b = e.currentTarget; ocupado(b, true);
+  try { await updateDoc(doc(db, 'solicitudes', SOL.x.id), { estado: 'RECHAZADA', motivo: limpio(motivo), atendidoPor: YO.nombre, atendidoMs: Date.now() }); $('dSol').close(); toast('Solicitud rechazada.'); cargarSolicitudes(); }
+  catch (err) { $('solMsg').textContent = errorTexto(err); }
+  ocupado(b, false);
+});
+$('fSolAt').addEventListener('submit', async e => {
+  e.preventDefault(); if (!SOL?.editable) return;
+  const x = SOL.x, fecha = $('solFEnt').value, recibe = limpio($('solRecPor').value).toUpperCase(), entrega = limpio($('solEntPor').value).toUpperCase();
+  const msg = t => { $('solMsg').textContent = t; };
+  if (!fecha) return msg('Falta la fecha de entrega.');
+  if (!recibe) return msg('Escribe quién recibe.');
+  const lineas = SOL.lineas.map(l => ({ ...l, entregar: r4(Number(l.entregar) || 0) }));
+  if (lineas.some(l => l.entregar > 0 && !l.prodId)) return msg('Hay materiales a entregar sin elegir su material del kardex (o pon 0 si no se entrega).');
+  if (!lineas.some(l => l.entregar > 0)) return msg('No hay nada para entregar. Si no se atenderá, usa “Rechazar”.');
+  const b = $('solEntregar'); ocupado(b, true, 'Registrando…'); msg('');
+  try {
+    await runTransaction(db, async tx => {
+      const ref = doc(db, 'solicitudes', x.id), s = await tx.get(ref);
+      if (!s.exists() || s.data().estado !== 'PENDIENTE') throw new Error('Esta solicitud ya fue atendida o rechazada por otra persona.');
+      const est = new Map();
+      for (const pid of new Set(lineas.filter(l => l.entregar > 0).map(l => l.prodId))) { const ps = await tx.get(doc(db, 'productos', pid)); if (!ps.exists()) throw new Error('Un material ya no existe en el kardex.'); est.set(pid, ps.data()); }
+      let ms = Date.now(), total = 0;
+      const detalle = lineas.map(l => {
+        if (!(l.entregar > 0)) return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: '', producto: '', unidad: l.unidadSol, cant: 0, cu: 0, ct: 0 };
+        const p = est.get(l.prodId);
+        if (l.entregar > p.stock + 1e-9) throw new Error(`Stock insuficiente de ${p.nombre}: hay ${nq(p.stock)} ${p.unidad}.`);
+        const cu = p.cProm || 0, ct = r2(l.entregar * cu);
+        p.stock = r4(p.stock - l.entregar); p.valor = p.stock <= 1e-9 ? 0 : r2(p.valor - ct); p.cProm = p.stock > 0 ? r4(p.valor / p.stock) : 0; total += ct;
+        tx.set(doc(collection(db, 'movimientos')), {
+          productoId: l.prodId, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, fecha, ms: ms++, tipo: 'SALIDA', origen: 'CONSUMO',
+          documento: `Solicitud N.º ${x.numero}`, solicitudId: x.id, tercero: x.centro, persona: recibe,
+          cant: l.entregar, cu, ct, saldoCant: p.stock, cProm: p.cProm, saldoValor: p.valor, usuario: YO.nombre, uid: YO.uid, creado: serverTimestamp()
+        });
+        return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, cant: l.entregar, cu, ct };
+      });
+      for (const [pid, p] of est) tx.update(doc(db, 'productos', pid), { stock: p.stock, valor: p.valor, cProm: p.cProm, actMs: Date.now(), ultMov: fecha });
+      tx.update(ref, { estado: 'ATENDIDA', fechaEntrega: fecha, entregadoPor: entrega, recibidoPor: recibe, entrega: detalle, totalCosto: r2(total), atendidoPor: YO.nombre, atendidoMs: Date.now() });
+    });
+    $('dSol').close(); toast(`Solicitud N.º ${x.numero} entregada y descontada del kardex.`); cargarSolicitudes();
+  } catch (err) { msg(errorTexto(err)); }
+  ocupado(b, false);
+});
+
+// Formato impreso como el de papel: "Formato de consumo de materiales de escritorio"
+function imprimirSolicitud(x, borrador) {
+  if (!x) return;
+  const filas = borrador ? borrador.lineas.map(l => { const p = l.prodId ? PRODUCTOS.get(l.prodId) : null, cu = p?.cProm || 0; return { codigo: p?.codigo || '', cant: l.entregar, unidad: p?.unidad || l.unidadSol, desc: p?.nombre || l.desc, cu, ct: r2(cu * l.entregar) }; })
+    : x.entrega ? x.entrega.map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.producto || i.desc, cu: i.cu, ct: i.ct, pedido: i.desc, cantSol: i.cantSol }))
+      : (x.items || []).map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.desc, cu: null, ct: null }));
+  const tot = filas.reduce((a, f) => a + (f.ct || 0), 0);
+  const w = window.open('', '_blank'); if (!w) return toast('El navegador bloqueó la ventana. Permite las ventanas emergentes para imprimir.', true);
+  w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Solicitud N.º ${x.numero}</title><style>
+    body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:28px;font-size:13px}
+    .cab{display:flex;justify-content:space-between;align-items:center}.cab img{width:70px}
+    h1{font-size:17px;text-decoration:underline;margin:0}
+    .datos{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:18px 0}
+    .datos div{display:flex;gap:8px;align-items:center}.datos b{border:1.5px solid #222;padding:4px 10px;min-width:120px;display:inline-block}
+    table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1.5px solid #222;padding:6px 8px}th{background:#e8e8e8}
+    td.n{text-align:right}tfoot td{font-weight:bold}
+    .firmas{display:flex;justify-content:space-between;margin-top:60px}.firmas div{width:40%;text-align:center;border-top:1.5px solid #222;padding-top:6px}
+    .nota{color:#666;font-size:11px}
+    @media print{body{margin:10mm}}
+  </style></head><body>
+    <div class="cab"><h1>FORMATO DE CONSUMO DE MATERIALES DE ESCRITORIO</h1><img src="${esc(new URL('logo.png', location.href).href)}" alt=""></div>
+    <div class="datos">
+      <div>Fecha de solicitud <b>${fmtF(x.fecha)}</b></div><div>N.º correlativo <b>${x.numero}</b></div>
+      <div>Fecha de entrega <b>${fmtF(borrador ? $('solFEnt').value : x.fechaEntrega) || '&nbsp;'}</b></div><div>Centro de costo <b>${esc(x.centroNombre || x.centro)}</b></div>
+    </div>
+    <table><thead><tr><th>Código</th><th>Cantidad</th><th>Descripción</th><th>Costo unitario</th><th>Costo total</th></tr></thead><tbody>
+    ${filas.map(f => `<tr><td>${esc(f.codigo || '')}</td><td>${f.cant ? nq(f.cant) + ' ' + esc(f.unidad || '') : (x.entrega ? '<span class="nota">no entregado</span>' : '')}</td><td>${esc(f.desc)}${f.pedido && f.pedido !== f.desc ? `<br><span class="nota">Pidió: ${esc(f.pedido)} (${nq(f.cantSol)})</span>` : ''}</td><td class="n">${f.cu === null ? '' : n2(f.cu)}</td><td class="n">${f.ct === null ? '' : n2(f.ct)}</td></tr>`).join('')}
+    ${Array.from({ length: Math.max(0, 8 - filas.length) }, () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>').join('')}
+    </tbody>${x.entrega || borrador ? `<tfoot><tr><td colspan="4" class="n">TOTAL S/</td><td class="n">${n2(tot)}</td></tr></tfoot>` : ''}</table>
+    <p class="nota">Solicitado por: ${esc(x.solicitante)}${x.nota ? ' · ' + esc(x.nota) : ''}</p>
+    <div class="firmas"><div>Entregado por: ${esc(borrador ? limpio($('solEntPor').value) : x.entregadoPor || '')}</div><div>Recibido por: ${esc(borrador ? limpio($('solRecPor').value) : x.recibidoPor || '')}</div></div>
+    <script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
 
 /* ================= Salida de materiales (módulo aparte; el kardex solo se consulta) ================= */
 const SAL = { lista: [] };
