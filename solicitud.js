@@ -78,7 +78,6 @@ $('fSol').addEventListener('submit', async e => {
     const q = x.tipo === 'LIMPIEZA' ? 'En materiales de limpieza' : 'En útiles de escritorio';
     if (x.items.some(i => !i.desc)) return msg(`${q} hay una cantidad sin descripción del material.`);
     if (x.items.some(i => !(i.cant > 0))) return msg(`${q} falta la cantidad de algún material.`);
-    if (x.items.some(i => !i.unidad)) return msg(`${q} falta la unidad de algún material (UND, PAQUETE, CAJA…).`);
     if (x.items.length > 40) return msg(`${q} hay más de 40 materiales.`);
   }
   msg('');
