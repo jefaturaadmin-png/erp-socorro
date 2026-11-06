@@ -182,7 +182,11 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 .dudoso{background:var(--ambar-f)}
 
 /* Tarjeta kardex */
-.dos.kdos{grid-template-columns:minmax(0,4fr) minmax(0,9fr)}
+.k-lista tbody tr{cursor:pointer}
+.k-lista tbody tr:hover td{background:var(--suave)}
+#kVista{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+#kVista[hidden]{display:none}
+#kVista .panel{align-self:stretch}
 .tk{display:flex;flex-direction:column;gap:10px}
 .tk-cab{display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,var(--marca),var(--pri));color:#fff;border-radius:8px;padding:8px 10px}
 .tk-cab h3{flex:1;margin:0;text-align:center;font-size:20px;letter-spacing:1.5px;color:#fff}
@@ -220,7 +224,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 .tk-ic:hover{background:var(--suave)}
 .tk-ic.peligro{color:var(--rojo)}
 .tk-tab tfoot td{background:var(--suave);border-top:2px solid var(--pri)}
-@media (max-width:1000px){ .dos.kdos{grid-template-columns:1fr} .tk-datos{grid-template-columns:1fr} .tk-cab h3{font-size:16px} }
+@media (max-width:1000px){ .tk-datos{grid-template-columns:1fr} .tk-cab h3{font-size:16px} }
 @media (max-width:1000px){
   .cuerpo{grid-template-columns:1fr}
   .side{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--borde);padding:8px}
@@ -318,16 +322,29 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 
       <!-- Kardex -->
       <section id="m-kardex" class="mod" hidden>
-        <div class="cab"><div><h2>Kardex</h2><p class="nota">Almacén único. Costo promedio ponderado, valores sin IGV.</p></div>
-          <div class="acc"><button class="btn" type="button" id="kMov">Registrar salida / ajuste</button><button class="btn sec" type="button" id="kImp">Importar Excel de kardex</button><button class="btn peligro" type="button" id="kDeshacer">Deshacer importación</button><input type="file" id="kImpFile" accept=".xlsx,.xls" hidden><button class="btn sec" type="button" id="kCsvProd">Exportar productos</button><button class="btn sec" type="button" id="kCsvTodo">Exportar kardex completo</button></div></div>
-        <div class="tarjetas" id="kTarjetas"></div>
-        <div class="dos kdos">
+        <div id="kLista">
+          <div class="cab"><div><h2>Kardex</h2><p class="nota">Solo consulta. Haz clic en un material para ver su tarjeta kardex. Valores a costo promedio sin IGV.</p></div>
+            <div class="acc"><button class="btn sec" type="button" id="kImp" hidden>Importar Excel de kardex</button><button class="btn peligro" type="button" id="kDeshacer" hidden>Deshacer importación</button><input type="file" id="kImpFile" accept=".xlsx,.xls" hidden><button class="btn sec" type="button" id="kCsvProd">Exportar productos</button><button class="btn sec" type="button" id="kCsvTodo">Exportar kardex completo</button></div></div>
           <div class="panel">
             <input type="search" id="kBuscar" placeholder="Buscar producto por código o nombre" aria-label="Buscar producto">
-            <div class="tabla"><table><thead><tr><th>Código</th><th>Producto</th><th class="num">Stock</th><th class="num">C. prom.</th><th class="num">Valor</th></tr></thead><tbody id="kProds"></tbody></table></div>
+            <div class="tabla"><table class="k-lista"><thead><tr><th>Código</th><th>Producto</th><th class="num">Stock</th><th class="num">Valor (S/)</th></tr></thead><tbody id="kProds"></tbody></table></div>
           </div>
-          <div class="panel" id="kDet"><div class="vacio">Elige un producto para ver su kardex.</div></div>
         </div>
+        <div id="kVista" hidden>
+          <button class="btn sec" type="button" id="kVolver">← Volver a la lista</button>
+          <div class="panel" id="kDet"></div>
+        </div>
+      </section>
+      <section id="m-salidas" class="mod" hidden>
+        <div class="cab"><div><h2>Salida de materiales</h2><p class="nota">Entregas a cada área o centro de costos. Cada salida descuenta el stock del kardex a costo promedio.</p></div>
+          <div class="acc"><button class="btn" type="button" id="sNueva">+ Nueva salida</button><button class="btn sec" type="button" id="sCsv">Exportar Excel</button></div></div>
+        <div class="filtros">
+          <label>Mes<input type="month" id="sMes"></label>
+          <label>Tipo<select id="sTipo"><option value="SALIDA">Salidas</option><option value="AJUSTE">Ajustes</option><option value="">Salidas y ajustes</option></select></label>
+          <label class="crece">Buscar<input type="search" id="sBuscar" placeholder="Producto, destino, persona o motivo"></label>
+        </div>
+        <div class="resumen" id="sRes"></div>
+        <div class="tabla"><table><thead><tr><th>Fecha</th><th>Código</th><th>Producto</th><th class="num">Cantidad</th><th>Destino / área</th><th>Entregado a</th><th>Motivo / documento</th><th class="num">Costo total</th><th>Registró</th><th></th></tr></thead><tbody id="sFilas"><tr><td colspan="10" class="vacio">Cargando…</td></tr></tbody></table></div>
       </section>
 
       <!-- RRHH -->
@@ -525,7 +542,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <!-- Diálogo: salida / ajuste de kardex -->
 <dialog id="dMov" class="dlg medio" aria-labelledby="mTit">
   <form id="fMov">
-    <div class="dlg-cab"><h2 id="mTit">Salida o ajuste de kardex</h2><div class="acc"><button type="submit" class="btn">Registrar</button><button type="button" class="btn sec" id="mCerrar">Cancelar</button></div></div>
+    <div class="dlg-cab"><h2 id="mTit">Nueva salida de materiales</h2><div class="acc"><button type="submit" class="btn">Registrar</button><button type="button" class="btn sec" id="mCerrar">Cancelar</button></div></div>
     <div class="dlg-cuerpo">
       <div class="g2">
         <label class="s2">Producto<input id="mProd" list="dlProd" required></label>
@@ -592,6 +609,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.06c"></script>
+<script type="module" src="app.js?v=2026.11.06d"></script>
 </body>
 </html>
