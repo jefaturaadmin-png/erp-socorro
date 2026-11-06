@@ -10,7 +10,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06e'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.06f'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
@@ -377,6 +377,9 @@ async function abrirEditor(clase, c, modo) {
   ['cLeer', 'cGuardar', 'cAddLin', 'cCambiar'].forEach(id => $(id).hidden = ro);
   $('cIA').hidden = ro || !IA?.clave;
   if (compra && modo === 'editar') ['cLeer', 'cIA'].forEach(id => $(id).hidden = true); // los ítems ya están en el kardex: solo se corrige la cabecera
+  // En Ingreso de materiales no se adjunta foto ni se lee el comprobante: se escribe directo
+  $('dComp').querySelector('.comp-img').hidden = compra; $('dComp').querySelector('.comp').classList.toggle('sin-img', compra);
+  if (compra) ['cLeer', 'cIA'].forEach(id => $(id).hidden = true);
   $('cMsg').hidden = true;
   const ap = c?.aprobacion;
   $('cAprob').innerHTML = c ? `Registrado por <b>${esc(c.creadoPor?.nombre || '')}</b> el ${new Date(c.creadoMs).toLocaleString('es-PE')}. Aprobación: ${pill(c)}${ap?.usuario ? ` por ${esc(ap.usuario)} (${fmtF(ap.fecha)})` : ''}${ap?.motivo ? ` — ${esc(ap.motivo)}` : ''}${c.estado === 'ANULADO' ? ` · Anulado por ${esc(c.anuladoPor || '')}` : ''}` : '';
@@ -438,7 +441,7 @@ drop.addEventListener('click', e => { if (ED?.modo === 'ver' || ED?.adjData) { e
 ['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('arrastre'); }));
 ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('arrastre'); }));
 drop.addEventListener('drop', e => tomarArchivo(e.dataTransfer.files[0]));
-document.addEventListener('paste', e => { if (!$('dComp').open) return; const f = [...(e.clipboardData?.files || [])][0]; if (f) { e.preventDefault(); tomarArchivo(f); } });
+document.addEventListener('paste', e => { if (!$('dComp').open || ED?.clase === 'COMPRA') return; const f = [...(e.clipboardData?.files || [])][0]; if (f) { e.preventDefault(); tomarArchivo(f); } });
 function verAdjunto(a) {
   $('imgCuerpo').innerHTML = a.mime === 'application/pdf' ? `<iframe src="${urlAdjunto(a)}" style="width:100%;height:100%;min-height:75vh;border:0" title="PDF"></iframe>` : `<img src="data:${a.mime};base64,${a.d}" alt="Comprobante" style="max-width:100%">`;
   $('dImg').showModal();
