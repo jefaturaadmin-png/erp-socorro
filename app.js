@@ -10,7 +10,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06f'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.06g'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
@@ -380,6 +380,8 @@ async function abrirEditor(clase, c, modo) {
   // En Ingreso de materiales no se adjunta foto ni se lee el comprobante: se escribe directo
   $('dComp').querySelector('.comp-img').hidden = compra; $('dComp').querySelector('.comp').classList.toggle('sin-img', compra);
   if (compra) ['cLeer', 'cIA'].forEach(id => $(id).hidden = true);
+  // Campos que no se usan en Ingreso de materiales
+  ['cCentro', 'cCont', 'cDestino', 'cSol', 'cNotas'].forEach(id => { $(id).closest('label').hidden = compra; });
   $('cMsg').hidden = true;
   const ap = c?.aprobacion;
   $('cAprob').innerHTML = c ? `Registrado por <b>${esc(c.creadoPor?.nombre || '')}</b> el ${new Date(c.creadoMs).toLocaleString('es-PE')}. Aprobación: ${pill(c)}${ap?.usuario ? ` por ${esc(ap.usuario)} (${fmtF(ap.fecha)})` : ''}${ap?.motivo ? ` — ${esc(ap.motivo)}` : ''}${c.estado === 'ANULADO' ? ` · Anulado por ${esc(c.anuladoPor || '')}` : ''}` : '';
@@ -482,7 +484,7 @@ function marcaProd(l) {
 }
 function pintarLineas() {
   const compra = ED.clase === 'COMPRA', ro = ED.modo !== 'nuevo' && (ED.modo === 'ver' || compra), dis = ro ? ' disabled' : '';
-  $('cLinHead').innerHTML = `<tr><th>#</th><th>${compra ? 'Producto' : 'Concepto'}</th>${compra ? '<th>Unidad</th>' : ''}<th>Cant.</th><th>P. unit sin IGV</th>${compra ? '<th>Lote</th><th>Vence</th>' : ''}<th class="num">Subtotal</th><th class="num">IGV</th><th class="num">Total</th><th></th></tr>`;
+  $('cLinHead').innerHTML = `<tr><th>#</th><th>${compra ? 'Producto' : 'Concepto'}</th>${compra ? '<th>Unidad</th>' : ''}<th>Cant.</th><th>P. unit sin IGV</th><th class="num">Subtotal</th><th class="num">IGV</th><th class="num">Total</th><th></th></tr>`;
   $('cLineas').innerHTML = ED.lineas.map((l, i) => {
     const c = calcLinea(l);
     return `<tr data-i="${i}"><td class="c">${i + 1}</td>
@@ -490,7 +492,6 @@ function pintarLineas() {
       ${compra ? `<td><input class="w6" data-f="unidad" list="dlUni" value="${esc(l.unidad || 'UND')}"${dis} aria-label="Unidad"></td>` : ''}
       <td><input class="w6 num" type="number" step="any" min="0" data-f="cant" value="${l.cant}"${dis} aria-label="Cantidad"></td>
       <td><input class="w8 num" type="number" step="any" min="0" data-f="vu" value="${l.vu}"${dis} aria-label="Precio unitario sin IGV"></td>
-      ${compra ? `<td><input class="w8" data-f="lote" value="${esc(l.lote || '')}"${dis} aria-label="Lote"></td><td><input type="date" data-f="vence" value="${esc(l.vence || '')}"${dis} aria-label="Vencimiento"></td>` : ''}
       <td class="num" data-c="sub">${n2(c.sub)}</td><td class="num" data-c="igv">${n2(c.igv)}</td><td class="num" data-c="tot">${n2(c.tot)}</td>
       <td>${ro ? '' : '<button type="button" class="x" data-quitar title="Quitar ítem" aria-label="Quitar ítem">×</button>'}</td></tr>`;
   }).join('') || `<tr><td colspan="11" class="vacio">Sin ítems.</td></tr>`;
@@ -703,7 +704,7 @@ function validar(f, lineas) {
   if (!f.razon) return 'Falta el nombre del proveedor.';
   if (!f.empresa) return 'Elige la empresa.';
   if (!f.gasto) return 'Elige el tipo de gasto.';
-  if (!f.centro) return 'Elige el centro de costos.';
+  if (!f.centro && ED?.clase !== 'COMPRA') return 'Elige el centro de costos.';
   if (!lineas.length) return 'Agrega al menos un ítem con descripción y cantidad.';
   if (lineas.some(l => l.cant <= 0)) return 'Todas las cantidades deben ser mayores a cero.';
   return '';
