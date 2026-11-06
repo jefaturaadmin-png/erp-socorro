@@ -302,7 +302,7 @@ function pintarComps(clase) {
   sec.querySelector('[data-r="filas"]').innerHTML = l.length ? l.map(c => {
     const anul = c.estado === 'ANULADO', pendiente = c.aprobacion?.estado === 'PENDIENTE';
     const acc = [`<button class="btn sec chico" data-a="ver" data-id="${esc(c.id)}">Ver</button>`];
-    if (serv && !anul && pendiente && puede('comprobantes')) acc.push(`<button class="btn sec chico" data-a="editar" data-id="${esc(c.id)}">Editar</button>`);
+    if (!anul && puede('comprobantes') && (serv ? pendiente : pendiente || c.importado)) acc.push(`<button class="btn sec chico" data-a="editar" data-id="${esc(c.id)}">Editar</button>`);
     if (!anul && pendiente && puede('aprobar')) acc.push(`<button class="btn chico" data-a="aprobar" data-id="${esc(c.id)}">Aprobar</button><button class="btn peligro chico" data-a="rechazar" data-id="${esc(c.id)}">Rechazar</button>`);
     if (!anul && puede('comprobantes')) acc.push(`<button class="btn peligro chico" data-a="anular" data-id="${esc(c.id)}">Anular</button>`);
     const det = serv ? `${esc(c.gasto || '')}<br><small class="nota">${esc(c.centro || '')}</small>` : `${(c.lineas || []).length} ítem(s)<br><small class="nota">${esc((c.lineas || []).slice(0, 2).map(x => x.desc).join(', '))}${(c.lineas || []).length > 2 ? '…' : ''}</small>`;
@@ -369,9 +369,10 @@ async function abrirEditor(clase, c, modo) {
   $('cDet').value = c?.detraccion || 'NO'; $('cDetPct').value = c?.detPct ?? 0;
   $('cRet').value = c?.retencion || 'NO'; $('cRetPct').value = c?.retPct ?? 8; $('cSol').value = c?.solicitud || ''; $('cNotas').value = c?.notas || '';
   if (!c) calcVence();
-  CAMPOS.forEach(id => $(id).disabled = ro || (modo === 'editar' && CAMPOS_BLOQ_EDIT.includes(id)));
+  CAMPOS.forEach(id => $(id).disabled = ro || (modo === 'editar' && CAMPOS_BLOQ_EDIT.includes(id) && !c?.importado));
   ['cLeer', 'cGuardar', 'cAddLin', 'cCambiar'].forEach(id => $(id).hidden = ro);
   $('cIA').hidden = ro || !IA?.clave;
+  if (compra && modo === 'editar') ['cLeer', 'cIA'].forEach(id => $(id).hidden = true); // los ítems ya están en el kardex: solo se corrige la cabecera
   $('cMsg').hidden = true;
   const ap = c?.aprobacion;
   $('cAprob').innerHTML = c ? `Registrado por <b>${esc(c.creadoPor?.nombre || '')}</b> el ${new Date(c.creadoMs).toLocaleString('es-PE')}. Aprobación: ${pill(c)}${ap?.usuario ? ` por ${esc(ap.usuario)} (${fmtF(ap.fecha)})` : ''}${ap?.motivo ? ` — ${esc(ap.motivo)}` : ''}${c.estado === 'ANULADO' ? ` · Anulado por ${esc(c.anuladoPor || '')}` : ''}` : '';
@@ -712,7 +713,7 @@ $('fComp').addEventListener('submit', async e => {
   try {
     if (ED.archivo) { const r = await addDoc(collection(db, 'adjuntos'), { ...ED.archivo, uid: YO.uid, creadoMs: Date.now() }); nuevoAdj = r.id; }
     const datos = { ...f, clase: ED.clase, lineas, ...t, adjuntoId: nuevoAdj || ED.adjuntoId || null };
-    if (ED.clase === 'COMPRA') await guardarCompra(id, datos); else await guardarServicio(id, datos);
+    if (ED.clase === 'COMPRA') await (ED.modo === 'editar' ? guardarCompraCab : guardarCompra)(id, datos); else await guardarServicio(id, datos);
     PROVEEDORES.set(f.ruc, { ruc: f.ruc, razon: f.razon });
     $('dComp').close(); toast('Comprobante guardado.');
     const st = EST[ED.clase];
@@ -779,6 +780,22 @@ async function guardarCompra(id, datos) {
     tx.set(doc(db, 'proveedores', datos.ruc), { ruc: datos.ruc, razon: datos.razon, actMs: Date.now() }, { merge: true });
   });
 }
+// Edición de una factura de materiales ya registrada: solo cabecera; los ítems y el kardex no cambian
+async function guardarCompraCab(id, datos) {
+  const ref = doc(db, 'comprobantes', id), s = await getDoc(ref);
+  if (!s.exists() || s.data().estado === 'ANULADO') throw new Error('El comprobante ya no existe o está anulado.');
+  const prev = s.data(), conIgv = datos.afectoIgv === 'SI';
+  const lineas = (prev.lineas || []).map(l => { const igv = conIgv ? r2(l.sub * IGV) : 0; return { ...l, igv, tot: r2(l.sub + igv) }; });
+  await updateDoc(ref, { ...datos, lineas, editadoMs: Date.now(), editadoPor: YO.nombre });
+  await setDoc(doc(db, 'proveedores', datos.ruc), { ruc: datos.ruc, razon: datos.razon, actMs: Date.now() }, { merge: true });
+  const docTxt = `${datos.tipo} ${datos.serie}-${datos.numero}`;
+  if (YO.rol === 'ADMIN' && (prev.razon !== datos.razon || `${prev.tipo} ${prev.serie}-${prev.numero}` !== docTxt)) {
+    const ms = await getDocs(query(collection(db, 'movimientos'), where('comprobanteId', '==', id)));
+    const lote = writeBatch(db); let n = 0;
+    ms.docs.forEach(d => { if (d.data().origen === 'COMPRA') { lote.update(d.ref, { tercero: datos.razon, documento: docTxt }); n++; } });
+    if (n) await lote.commit();
+  }
+}
 async function anularComp(c) {
   await runTransaction(db, async tx => {
     const ref = doc(db, 'comprobantes', c.id), s = await tx.get(ref);
@@ -842,7 +859,7 @@ function pintarDetKardex() {
     <div class="ficha"><div>Stock<b>${nq(p.stock)}</b></div><div>Costo promedio<b>S/ ${n2(p.cProm)}</b></div><div>Valor<b>S/ ${n2(p.valor)}</b></div><div>Movimientos<b>${kMovs.length}</b></div></div>
     <div class="tabla"><table><thead><tr><th>Fecha</th><th>Mov.</th><th>Documento</th><th>Proveedor / destino</th><th class="num">Entrada</th><th class="num">Salida</th><th class="num">Saldo</th><th class="num">C. unit</th><th class="num">C. total</th><th class="num">C. prom.</th><th class="num">Saldo S/</th>${adm ? '<th></th>' : ''}</tr></thead>
     <tbody>${kMovs.length ? kMovs.map(m => { const ent = esEntrada(m); const t = m.tipo === 'AJUSTE' ? 'AJUSTE' : m.tipo; const etq = m.origen === 'ANULACION' ? 'ANULA' : m.origen === 'SALDO INICIAL' ? 'SALDO INICIAL' : m.tipo === 'AJUSTE' ? m.origen : m.tipo;
-      return `<tr${m.saldoCant < -1e-9 ? ' style="background:var(--rojo-f)"' : ''}><td>${fmtF(m.fecha)}</td><td><span class="pill ${t}">${esc(etq)}</span></td><td>${esc(m.documento)}${m.lote ? `<br><small class="nota">Lote ${esc(m.lote)}${m.vence ? ' · vence ' + fmtF(m.vence) : ''}</small>` : ''}</td><td>${esc(nombreCC(m.tercero))}${m.persona ? `<br><small class="nota">${esc(m.persona)}</small>` : ''}</td><td class="num">${ent ? nq(m.cant) : ''}</td><td class="num">${ent ? '' : nq(m.cant)}</td><td class="num"><b>${nq(m.saldoCant)}</b></td><td class="num">${n2(m.cu)}</td><td class="num">${n2(m.ct)}</td><td class="num">${n2(m.cProm)}</td><td class="num">${n2(m.saldoValor)}</td>${adm ? `<td><div class="acciones"><button class="btn sec chico" data-ed="${esc(m.id)}">Editar</button><button class="btn peligro chico" data-del="${esc(m.id)}" aria-label="Eliminar movimiento">×</button></div></td>` : ''}</tr>`; }).join('') : `<tr><td colspan="12" class="vacio">Sin movimientos.</td></tr>`}</tbody></table></div>`;
+      return `<tr${m.saldoCant < -1e-9 ? ' style="background:var(--rojo-f)"' : ''}><td>${fmtF(m.fecha)}</td><td><span class="pill ${t}">${esc(etq)}</span></td><td>${m.comprobanteId ? `<a href="#" data-comp="${esc(m.comprobanteId)}" title="Ver la factura">${esc(m.documento)}</a>` : esc(m.documento)}${m.lote ? `<br><small class="nota">Lote ${esc(m.lote)}${m.vence ? ' · vence ' + fmtF(m.vence) : ''}</small>` : ''}</td><td>${esc(nombreCC(m.tercero))}${m.persona ? `<br><small class="nota">${esc(m.persona)}</small>` : ''}</td><td class="num">${ent ? nq(m.cant) : ''}</td><td class="num">${ent ? '' : nq(m.cant)}</td><td class="num"><b>${nq(m.saldoCant)}</b></td><td class="num">${n2(m.cu)}</td><td class="num">${n2(m.ct)}</td><td class="num">${n2(m.cProm)}</td><td class="num">${n2(m.saldoValor)}</td>${adm ? `<td><div class="acciones"><button class="btn sec chico" data-ed="${esc(m.id)}">Editar</button><button class="btn peligro chico" data-del="${esc(m.id)}" aria-label="Eliminar movimiento">×</button></div></td>` : ''}</tr>`; }).join('') : `<tr><td colspan="12" class="vacio">Sin movimientos.</td></tr>`}</tbody></table></div>`;
   $('kCsvMov').addEventListener('click', () => descargarCSV(`kardex_${p.codigo}.csv`, filasKardex(kMovs)));
   if (adm) {
     $('kEdProd').addEventListener('click', () => abrirEdProd(p));
@@ -851,7 +868,12 @@ function pintarDetKardex() {
   }
 }
 $('kDet').addEventListener('click', async e => {
-  const ed = e.target.closest('[data-ed]'), del = e.target.closest('[data-del]');
+  const ed = e.target.closest('[data-ed]'), del = e.target.closest('[data-del]'), comp = e.target.closest('[data-comp]');
+  if (comp) {
+    e.preventDefault();
+    try { const s = await getDoc(doc(db, 'comprobantes', comp.dataset.comp)); if (!s.exists()) return toast('La factura ya no existe.', true); const c = { id: s.id, ...s.data() }; return abrirEditor(c.clase || 'COMPRA', c, 'ver'); }
+    catch (err) { return toast(errorTexto(err), true); }
+  }
   if (ed) return abrirEdMov(kMovs.find(m => m.id === ed.dataset.ed));
   if (del) {
     const m = kMovs.find(x => x.id === del.dataset.del); if (!m) return;
@@ -951,11 +973,26 @@ $('epBorrar').addEventListener('click', async e => {
   ocupado(e.currentTarget, false);
 });
 $('kDeshacer').addEventListener('click', async e => {
-  const imp = [...PRODUCTOS.values()].filter(p => p.importado);
-  if (!imp.length) return toast('No hay productos importados de Excel.');
-  if (!confirm(`Se eliminarán ${imp.length} productos importados de Excel con todos sus movimientos, para volver a importarlos. ¿Continuar?`)) return;
+  const imp = [...PRODUCTOS.values()].filter(p => p.importado), ids = new Set(imp.map(p => p.id));
+  let comps = [];
+  try { comps = (await getDocs(query(collection(db, 'comprobantes'), where('importado', '==', true)))).docs; } catch (err) { console.warn(err); }
+  if (!imp.length && !comps.length) return toast('No hay nada importado de Excel.');
+  if (!confirm(`Se eliminarán ${imp.length} productos importados de Excel con todos sus movimientos y ${comps.length} facturas importadas, para volver a importarlos. ¿Continuar?`)) return;
   const b = e.currentTarget; ocupado(b, true, 'Eliminando…');
-  try { let k = 0; for (const p of imp) { await borrarProducto(p.id); b.textContent = `Eliminando… ${++k}/${imp.length}`; } kSel = null; $('kDet').innerHTML = '<div class="vacio">Importación deshecha. Ya puedes volver a importar el Excel.</div>'; toast('Importación deshecha.'); }
+  try {
+    let k = 0;
+    for (const c of comps) {
+      const ms = await getDocs(query(collection(db, 'movimientos'), where('comprobanteId', '==', c.id)));
+      const lote = writeBatch(db);
+      ms.docs.forEach(d => { if (!ids.has(d.data().productoId)) lote.update(d.ref, { comprobanteId: null }); });
+      lote.delete(c.ref); await lote.commit();
+      b.textContent = `Eliminando facturas… ${++k}/${comps.length}`;
+    }
+    k = 0;
+    for (const p of imp) { await borrarProducto(p.id); b.textContent = `Eliminando… ${++k}/${imp.length}`; }
+    kSel = null; $('kDet').innerHTML = '<div class="vacio">Importación deshecha. Ya puedes volver a importar el Excel.</div>'; toast('Importación deshecha.');
+    if (EST.COMPRA.armado) cargarComps('COMPRA');
+  }
   catch (err) { toast(errorTexto(err), true); }
   ocupado(b, false);
 });
@@ -990,8 +1027,9 @@ $('kImpFile').addEventListener('change', async e => {
       const k = norm(h.nombre);
       if (vistos.has(k)) { h.avisos.push(`El nombre del producto repite al de la hoja “${vistos.get(k)}”; se usará el nombre de la hoja.`); h.nombre = limpio(h.hoja).toUpperCase(); }
       vistos.set(norm(h.nombre), h.hoja);
-      if (buscarProd(h.nombre)) { h.avisos.push('Ya existe en el kardex; no se importará.'); h.sel = false; h.existe = true; }
+      if (buscarProd(h.nombre)) { h.avisos.push('Ya existe en el kardex: no se vuelve a importar, solo se enlazan sus entradas con sus facturas.'); h.sel = false; h.existe = true; }
     });
+    await prepararFacturasImp(f.name);
     pintarImp(); $('dImp').showModal();
   } catch (err) { toast('No se pudo leer el Excel: ' + err.message, true); }
   ocupado(b, false);
@@ -1032,7 +1070,7 @@ function leerHojaKardex(hoja, filas) {
     }
     if (qIn > 0) {
       const cu = num(c(6)) || (num(c(7)) / qIn); stock = r4(stock + qIn); valor = r2(valor + qIn * cu); h.ent = r4(h.ent + qIn);
-      h.movs.push({ fecha, tipo: 'ENTRADA', origen: 'COMPRA', documento: doc0 || det || 'Compra', tercero: '', cant: qIn, cu: r4(cu), ct: r2(qIn * cu), saldoCant: stock, cProm: stock > 0 ? r4(valor / stock) : 0, saldoValor: valor });
+      h.movs.push({ fecha, fac: claveDoc(doc0), tipo: 'ENTRADA', origen: 'COMPRA', documento: doc0 || det || 'Compra', tercero: '', cant: qIn, cu: r4(cu), ct: r2(qIn * cu), saldoCant: stock, cProm: stock > 0 ? r4(valor / stock) : 0, saldoValor: valor });
     }
     if (qOut > 0) {
       const cu = stock > 0 ? valor / stock : num(c(9));
@@ -1060,21 +1098,134 @@ function pintarImp() {
   const sel = IMP.filter(h => h.sel), mov = sel.reduce((a, h) => a + finalImp(h).movs.length, 0), val = sel.reduce((a, h) => a + finalImp(h).valor, 0);
   $('impMsg').innerHTML = `Se encontraron <b>${IMP.length}</b> productos. Seleccionados: <b>${sel.length}</b> con <b>${mov}</b> movimientos; valor final del inventario S/ <b>${n2(val)}</b>. Los saldos se recalculan con costo promedio. Revisa las filas con avisos antes de importar.`;
   $('impFilas').innerHTML = IMP.map((h, i) => `<tr><td><input type="checkbox" data-i="${i}"${h.sel ? ' checked' : ''}${h.existe ? ' disabled' : ''} aria-label="Importar ${esc(h.nombre)}"></td><td>${esc(h.hoja)}</td><td>${esc(h.nombre)}</td><td>${esc(h.unidad)}</td><td class="num">${nq(h.ini)}</td><td class="num">${nq(h.ent)}</td><td class="num">${nq(h.sal)}</td><td class="num"><b>${nq(finalImp(h).stock)}</b>${$('impCuadre').checked && h.ajuste ? `<br><small class="nota">ajuste ${h.ajuste.origen === 'AJUSTE+' ? '+' : '−'}${nq(h.ajuste.cant)}</small>` : ''}</td><td class="num">${n2(finalImp(h).cProm)}</td><td class="num">${n2(finalImp(h).valor)}</td><td>${h.avisos.map(a => `<small class="nota" style="color:var(--ambar)">${esc(a)}</small>`).join('<br>')}</td></tr>`).join('');
-  $('impOk').disabled = !sel.length;
+  pintarFacsImp();
+  $('impOk').disabled = !sel.length && !($('impFacs').checked && FACS_IMP.some(g => !g.existente && g.items.length));
 }
 $('impFilas').addEventListener('change', e => { const c = e.target.closest('[data-i]'); if (c) { IMP[+c.dataset.i].sel = c.checked; pintarImp(); } });
 $('impTodos').addEventListener('change', e => { IMP.forEach(h => { if (!h.existe && h.movs.length) h.sel = e.target.checked; }); pintarImp(); });
 $('impCerrar').addEventListener('click', () => $('dImp').close());
 $('impCuadre').addEventListener('change', pintarImp);
+/* Facturas dentro del Excel de kardex: las entradas de todas las hojas se agrupan por número de comprobante */
+// "FAC FR01-40815", "fr01-40815", "FACFR01-41544", "FR001-40014", "FR01 - 45450" → { serie: 'FR01', numero: '40815' }
+function claveDoc(txt) {
+  let t = String(txt ?? '').toUpperCase().replace(/\s+/g, ' ').trim(); if (!t) return null;
+  const tipo = /^BOL/.test(t) ? 'BOLETA' : 'FACTURA';
+  t = t.replace(/^(FACTURA|FACT|FAC|FA|BOLETA|BOL)\.?\s*(?=[A-Z])/, '');
+  const m = /\b([A-Z]{1,3}) ?(\d{1,4}) ?- ?0*(\d+)\b/.exec(t); if (!m) return null;
+  let dig = m[2]; const cab = 4 - m[1].length; // la serie SUNAT tiene 4 caracteres: FR001 → FR01
+  if (dig.length > cab && /^0+$/.test(dig.slice(0, dig.length - cab))) dig = dig.slice(-cab);
+  const serie = m[1] + dig, numero = m[3];
+  return { tipo, serie, numero, clave: serie + '-' + numero };
+}
+const parecido = (a, b) => { if (a === b) return false; if (b.startsWith(a) || a.startsWith(b)) return true; if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++; return d === 1; };
+let FACS_IMP = [], FAC_FIX = {}, PROV_SERIE = {}, COMP_REG = new Map(), IMP_ARCH = '';
+async function prepararFacturasImp(archivo) {
+  FAC_FIX = {}; PROV_SERIE = {}; COMP_REG = new Map(); IMP_ARCH = archivo;
+  const n = norm(archivo), tema = /escritorio|oficina/.test(n) ? 'ESCRITORIO' : /limpieza/.test(n) ? 'LIMPIEZA' : '';
+  if (tema) $('impCat').value = 'ÚTILES DE ' + tema;
+  const gasto = tema === 'ESCRITORIO' ? LISTAS.gastos.find(g => /oficina|escritorio/i.test(g)) : tema === 'LIMPIEZA' ? LISTAS.gastos.find(g => /limpieza/i.test(g)) : '';
+  opciones($('impEmp'), LISTAS.empresas.map(e => e.nombre), LISTAS.empresas[0]?.nombre);
+  opciones($('impGasto'), LISTAS.gastos, gasto || 'MATERIALES');
+  opciones($('impCentro'), LISTAS.areas, LISTAS.areas.find(a => /administraci/i.test(a)) || LISTAS.areas[0]);
+  try {
+    const s = await getDocs(query(collection(db, 'comprobantes'), where('clase', '==', 'COMPRA')));
+    s.forEach(d => {
+      const c = d.data(); if (c.estado === 'ANULADO') return;
+      const k = claveDoc(`${c.serie}-${c.numero}`); if (!k) return;
+      COMP_REG.set(k.clave, { id: d.id, ...c });
+      if (/^\d{11}$/.test(c.ruc || '') && !PROV_SERIE[k.serie]) PROV_SERIE[k.serie] = { ruc: c.ruc, razon: c.razon || '' };
+    });
+  } catch (e) { console.warn('comprobantes', e); }
+  await cargarProveedores();
+}
+function armarFacturas() {
+  const grupos = new Map();
+  IMP.forEach(h => h.movs.forEach(m => {
+    m._g = null;
+    if (!m.fac || (!h.sel && !h.existe)) return;
+    const k = claveDoc(FAC_FIX[m.fac.clave] || m.fac.clave) || m.fac;
+    let g = grupos.get(k.clave);
+    if (!g) grupos.set(k.clave, g = { ...k, origs: new Set(), items: [], avisos: [] });
+    g.origs.add(m.fac.clave); g.items.push({ h, m }); m._g = g;
+  }));
+  const l = [...grupos.values()];
+  l.forEach(g => {
+    const cnt = {}; g.items.forEach(({ m }) => { cnt[m.fecha] = (cnt[m.fecha] || 0) + 1; });
+    const fechas = Object.keys(cnt).sort();
+    g.fecha = fechas.slice().sort((a, b) => cnt[b] - cnt[a] || a.localeCompare(b))[0];
+    if (fechas.length > 1) g.avisos.push(`Fechas distintas en el Excel (${fechas.map(fmtF).join(', ')}); se usa ${fmtF(g.fecha)}.`);
+    g.sub = r2(g.items.reduce((a, { m }) => a + r2(m.cant * m.cu), 0));
+    g.igv = r2(g.items.reduce((a, { m }) => a + r2(r2(m.cant * m.cu) * IGV), 0));
+    g.existente = COMP_REG.get(g.clave) || null;
+    if (g.existente) g.avisos.push('Ya está registrada en Ingreso de materiales: no se vuelve a crear.');
+    if (g.items.some(x => x.h.existe)) g.avisos.push('Incluye materiales que ya estaban en el kardex: se enlazan sus entradas.');
+  });
+  l.forEach(g => {
+    const otro = l.find(o => o !== g && o.serie === g.serie && o.fecha === g.fecha && o.items.length > g.items.length && parecido(g.numero, o.numero));
+    if (otro) g.avisos.push(`¿Es la ${otro.clave}? Misma fecha y número parecido; si es la misma factura, corrige el número.`);
+  });
+  return l.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.clave.localeCompare(b.clave));
+}
+function pintarFacsImp() {
+  const on = $('impFacs').checked; $('impFacBox').hidden = !on;
+  ['impEmp', 'impGasto', 'impCentro', 'impIgv'].forEach(i => { $(i).disabled = !on; });
+  FACS_IMP = armarFacturas();
+  if (!on) return;
+  const conIgv = $('impIgv').checked, nuevas = FACS_IMP.filter(g => !g.existente);
+  const series = {}; FACS_IMP.forEach(g => { series[g.serie] = (series[g.serie] || 0) + 1; });
+  $('impMsg').innerHTML += ` Facturas encontradas: <b>${FACS_IMP.length}</b> (${nuevas.length} nuevas) por S/ <b>${n2(nuevas.reduce((a, g) => a + g.sub + (conIgv ? g.igv : 0), 0))}</b>.`;
+  $('impSeries').innerHTML = Object.keys(series).sort().map(se => {
+    const p = PROV_SERIE[se] || {};
+    return `<tr><td><b>${esc(se)}</b></td><td class="num">${series[se]}</td><td><input class="w8" data-ser="${esc(se)}" data-c="ruc" list="dlProv" inputmode="numeric" maxlength="11" value="${esc(p.ruc || '')}" placeholder="11 dígitos" aria-label="RUC del proveedor de la serie ${esc(se)}"></td><td><input data-ser="${esc(se)}" data-c="razon" value="${esc(p.razon || '')}" placeholder="Razón social" style="min-width:260px;width:100%" aria-label="Razón social del proveedor de la serie ${esc(se)}"></td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="vacio">—</td></tr>';
+  $('impFacFilas').innerHTML = FACS_IMP.length ? FACS_IMP.map((g, i) => `<tr${g.existente ? ' class="anulado"' : ''}>
+      <td><input class="w8" data-fac="${i}" value="${esc(g.clave)}" aria-label="Serie y número de la factura"${g.origs.size > 1 ? ` title="Junta lo escrito como: ${esc([...g.origs].join(', '))}"` : ''}></td>
+      <td>${fmtF(g.fecha)}</td><td class="num">${g.items.length}</td>
+      <td><small>${esc(g.items.map(({ h, m }) => `${h.nombre} (${nq(m.cant)})`).join(', '))}</small></td>
+      <td class="num">${n2(g.sub)}</td><td class="num"><b>${n2(g.sub + (conIgv ? g.igv : 0))}</b></td>
+      <td>${g.avisos.map(a => `<small class="nota" style="color:var(--ambar)">${esc(a)}</small>`).join('<br>')}</td></tr>`).join('')
+    : '<tr><td colspan="7" class="vacio">No se encontraron números de factura en la columna “Documento”.</td></tr>';
+}
+$('impFacFilas').addEventListener('change', e => {
+  const i = e.target.closest('[data-fac]'); if (!i) return;
+  const g = FACS_IMP[+i.dataset.fac], k = claveDoc(i.value);
+  if (!k) { toast('Escribe la serie y el número, por ejemplo FR01-40815.', true); i.value = g.clave; return; }
+  g.origs.forEach(o => { FAC_FIX[o] = k.clave; });
+  pintarImp();
+});
+$('impSeries').addEventListener('change', e => {
+  const i = e.target.closest('[data-ser]'); if (!i) return;
+  const se = i.dataset.ser, p = PROV_SERIE[se] || (PROV_SERIE[se] = { ruc: '', razon: '' });
+  if (i.dataset.c === 'ruc') {
+    p.ruc = i.value.replace(/\D/g, ''); i.value = p.ruc;
+    const conocido = PROVEEDORES.get(p.ruc), raz = $('impSeries').querySelector(`[data-ser="${CSS.escape(se)}"][data-c="razon"]`);
+    if (conocido && !p.razon) { p.razon = conocido.razon; raz.value = conocido.razon; }
+  } else p.razon = limpio(i.value).toUpperCase();
+});
+['impFacs', 'impIgv'].forEach(id => $(id).addEventListener('change', pintarImp));
+const lineaImp = (desc, prodId, codigo, unidad, cant, cu, conIgv) => { const sub = r2(cant * cu), igv = conIgv ? r2(sub * IGV) : 0; return { desc, prodId, codigo, unidad, cant: r4(cant), vu: r4(cu), lote: '', vence: '', sub, igv, tot: r2(sub + igv) }; };
+
 $('impOk').addEventListener('click', async () => {
-  const sel = IMP.filter(h => h.sel); if (!sel.length) return;
+  const sel = IMP.filter(h => h.sel), conFacs = $('impFacs').checked, conIgv = $('impIgv').checked;
+  const facs = conFacs ? armarFacturas().filter(g => !g.existente) : [];
+  IMP.forEach(h => h.movs.forEach(m => { if (!conFacs || m._g?.existente) m._g = null; }));
+  if (!sel.length && !facs.length) return;
+  for (const g of facs) {
+    const p = PROV_SERIE[g.serie] || {};
+    if (p.ruc && !/^\d{11}$/.test(p.ruc)) return toast(`El RUC de la serie ${g.serie} debe tener 11 dígitos.`, true);
+    Object.assign(g, { ruc: p.ruc || '', razon: p.razon || 'PROVEEDOR POR COMPLETAR', doc: `${g.tipo} ${g.serie}-${g.numero}`, lineas: [] });
+    g.id = idComp(g.ruc || 'SINRUC', g.tipo, g.serie, g.numero);
+  }
+  const sinProv = [...new Set(facs.filter(g => !g.ruc).map(g => g.serie))];
+  if (sinProv.length && !confirm(`Las series ${sinProv.join(', ')} no tienen proveedor. Las facturas se registrarán como “PROVEEDOR POR COMPLETAR” y luego podrás corregirlas con “Editar” en Ingreso de materiales.\n\n¿Importar de todos modos?`)) return;
   const b = $('impOk'); ocupado(b, true, 'Importando…');
   try {
     const cont = await getDoc(doc(db, 'config', 'contadores'));
     let n = cont.exists() ? (cont.data().producto || 0) : 0;
     const cat = limpio($('impCat').value).toUpperCase();
-    let lote = writeBatch(db), ops = 0, ms = Date.now(), hechos = 0;
+    let lote = writeBatch(db), ops = 0, ms = Date.now(), hechos = 0, sinEnlace = 0;
     const enviar = async (forzar) => { if (ops >= 450 || (forzar && ops)) { await lote.commit(); lote = writeBatch(db); ops = 0; } };
+    // 1. Materiales nuevos con todo su kardex; sus entradas quedan enlazadas a su factura
     for (const h0 of sel) {
       const h = { ...h0, ...finalImp(h0) };
       if (h.stock < 0) throw new Error(`“${h.nombre}” quedaría con stock negativo. Activa “Cuadrar con el saldo final del Excel” o desmárcalo.`);
@@ -1082,14 +1233,52 @@ $('impOk').addEventListener('click', async () => {
       lote.set(doc(db, 'productos', pid), { codigo, nombre: h.nombre, nombreN: norm(h.nombre), unidad: h.unidad, categoria: cat, stock: h.stock, valor: h.valor, cProm: h.cProm, creadoMs: Date.now(), actMs: Date.now(), ultMov: h.movs[h.movs.length - 1]?.fecha || '', importado: true });
       ops++; await enviar();
       for (const m of h.movs) {
-        lote.set(doc(collection(db, 'movimientos')), { ...m, productoId: pid, codigo, producto: h.nombre, unidad: h.unidad, ms: ms++, usuario: YO.nombre + ' (importado de Excel)', uid: YO.uid, creado: serverTimestamp() });
+        const { fac, _g, ...mm } = m;
+        if (_g) { Object.assign(mm, { comprobanteId: _g.id, documento: _g.doc, tercero: _g.razon }); _g.lineas.push(lineaImp(h.nombre, pid, codigo, h.unidad, m.cant, m.cu, conIgv)); }
+        lote.set(doc(collection(db, 'movimientos')), { ...mm, productoId: pid, codigo, producto: h.nombre, unidad: h.unidad, ms: ms++, usuario: YO.nombre + ' (importado de Excel)', uid: YO.uid, creado: serverTimestamp() });
         ops++; await enviar();
       }
       lote.set(doc(db, 'config', 'contadores'), { producto: n }, { merge: true }); ops++;
       hechos++; b.textContent = `Importando… ${hechos}/${sel.length}`;
     }
+    // 2. Materiales que ya estaban en el kardex: se enlazan sus entradas existentes con la factura
+    for (const h of IMP.filter(x => x.existe)) {
+      const items = h.movs.filter(m => m._g); if (!items.length) continue;
+      const p = buscarProd(h.nombre); if (!p) continue;
+      const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', p.id)));
+      const libres = s.docs.filter(d => d.data().tipo === 'ENTRADA' && !d.data().comprobanteId);
+      for (const m of items) {
+        const i = libres.findIndex(d => claveDoc(d.data().documento)?.clave === m.fac.clave && Math.abs((d.data().cant || 0) - m.cant) < 1e-6);
+        if (i < 0) { sinEnlace++; continue; }
+        const d = libres.splice(i, 1)[0], x = d.data();
+        lote.update(d.ref, { comprobanteId: m._g.id, documento: m._g.doc, tercero: m._g.razon }); ops++; await enviar();
+        m._g.lineas.push(lineaImp(p.nombre, p.id, p.codigo, p.unidad, x.cant, x.cu || m.cu, conIgv));
+      }
+    }
+    // 3. Las facturas, con todos sus ítems
+    const emp = $('impEmp').value, empresaRuc = LISTAS.empresas.find(e => e.nombre === emp)?.ruc || '', centro = $('impCentro').value;
+    let nf = 0;
+    for (const g of facs) {
+      if (!g.lineas.length) continue;
+      const subtotal = r2(g.lineas.reduce((a, l) => a + l.sub, 0)), igv = r2(g.lineas.reduce((a, l) => a + l.igv, 0)), total = r2(subtotal + igv);
+      lote.set(doc(db, 'comprobantes', g.id), {
+        tipo: g.tipo, serie: g.serie, numero: g.numero, fechaEmision: g.fecha, fechaVence: '', ruc: g.ruc, razon: g.razon,
+        condicion: 'CONTADO', forma: '', moneda: 'PEN', gasto: $('impGasto').value, centro, afectoIgv: conIgv ? 'SI' : 'NO', contable: 'SI',
+        detraccion: 'NO', detPct: 0, retencion: 'NO', retPct: 0, empresa: emp, empresaRuc, destino: centro, solicitud: '',
+        notas: `Importada del Excel de kardex${IMP_ARCH ? ' (' + IMP_ARCH + ')' : ''}.`, mes: g.fecha.slice(0, 7), clase: 'COMPRA',
+        lineas: g.lineas, subtotal, igv, total, detMonto: 0, retMonto: 0, totalPagar: total, adjuntoId: null,
+        creadoMs: Date.now(), creadoPor: { uid: YO.uid, nombre: YO.nombre },
+        aprobacion: { estado: 'APROBADO', fecha: hoyISO(), usuario: YO.nombre, uid: YO.uid, motivo: 'Factura histórica importada del Excel de kardex' },
+        estado: 'REGISTRADO', importado: true
+      });
+      ops++; nf++;
+      if (g.ruc) { lote.set(doc(db, 'proveedores', g.ruc), { ruc: g.ruc, razon: g.razon, actMs: Date.now() }, { merge: true }); ops++; PROVEEDORES.set(g.ruc, { ruc: g.ruc, razon: g.razon }); }
+      await enviar();
+    }
     await enviar(true);
-    $('dImp').close(); toast(`${sel.length} productos importados al kardex.`);
+    $('dImp').close();
+    toast(`${sel.length} materiales importados al kardex y ${nf} facturas registradas en Ingreso de materiales.${sinEnlace ? ` ${sinEnlace} entradas de materiales existentes no se encontraron para enlazar.` : ''}`);
+    if (EST.COMPRA.armado) cargarComps('COMPRA');
   } catch (err) { toast('Error al importar: ' + errorTexto(err) + '. Revisa el kardex antes de volver a intentarlo.', true); }
   ocupado(b, false);
 });

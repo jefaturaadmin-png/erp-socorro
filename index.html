@@ -418,10 +418,26 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <!-- Diálogo: importar kardex desde Excel -->
 <dialog id="dImp" class="dlg grande" aria-labelledby="impTit">
   <div style="display:flex;flex-direction:column;height:100%">
-    <div class="dlg-cab"><h2 id="impTit">Importar kardex desde Excel</h2>
+    <div class="dlg-cab"><h2 id="impTit">Importar kardex desde Excel (por factura)</h2>
       <div class="acc"><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="impCuadre" checked> Cuadrar con el saldo final del Excel</label><label style="flex-direction:row;align-items:center;gap:6px">Categoría <input id="impCat" value="ÚTILES DE LIMPIEZA" style="width:200px"></label><button type="button" class="btn" id="impOk">Importar</button><button type="button" class="btn sec" id="impCerrar">Cancelar</button></div></div>
     <div class="dlg-cuerpo" style="flex:1;overflow:auto">
       <div class="aviso" id="impMsg"></div>
+      <h3 style="margin:14px 0 6px">1. Facturas de compra</h3>
+      <p class="nota" style="margin:0 0 8px">Las entradas del Excel se agrupan por número de factura (aunque estén escritas distinto en cada hoja: “FAC FR01-40815”, “fr01-40815”…). Cada factura se registra en <b>Ingreso de materiales</b> con todos sus ítems, y cada ítem queda enlazado al kardex de su material. Si un número está mal escrito, corrígelo en la tabla y se juntará con su factura.</p>
+      <div class="filtros">
+        <label style="flex-direction:row;align-items:center;gap:6px;min-width:0"><input type="checkbox" id="impFacs" checked> Registrar las facturas</label>
+        <label>Empresa<select id="impEmp"></select></label>
+        <label>Tipo de gasto<select id="impGasto"></select></label>
+        <label>Centro de costos<select id="impCentro"></select></label>
+        <label style="flex-direction:row;align-items:center;gap:6px;min-width:0"><input type="checkbox" id="impIgv" checked> Los costos del Excel no incluyen IGV (sumar 18% al total)</label>
+      </div>
+      <div id="impFacBox">
+        <h4 style="margin:12px 0 4px">Proveedor de cada serie</h4>
+        <p class="nota" style="margin:0 0 6px">El Excel no trae el proveedor. Escríbelo por serie (todas las facturas de esa serie lo usarán). Si no lo sabes ahora, déjalo vacío y complétalo después con “Editar” en Ingreso de materiales.</p>
+        <div class="tabla"><table><thead><tr><th>Serie</th><th class="num">Facturas</th><th>RUC</th><th>Razón social</th></tr></thead><tbody id="impSeries"></tbody></table></div>
+        <div class="tabla" style="margin-top:10px"><table><thead><tr><th>Factura (serie-número)</th><th>Emisión</th><th class="num">Ítems</th><th>Materiales</th><th class="num">Subtotal</th><th class="num">Total</th><th>Revisar</th></tr></thead><tbody id="impFacFilas"></tbody></table></div>
+      </div>
+      <h3 style="margin:18px 0 6px">2. Materiales (kardex)</h3>
       <div class="tabla"><table><thead><tr><th><input type="checkbox" id="impTodos" checked aria-label="Seleccionar todos"></th><th>Hoja</th><th>Producto</th><th>Unidad</th><th class="num">Saldo inicial</th><th class="num">Entradas</th><th class="num">Salidas</th><th class="num">Stock final</th><th class="num">C. prom.</th><th class="num">Valor</th><th>Revisar</th></tr></thead><tbody id="impFilas"></tbody></table></div>
     </div>
   </div>
