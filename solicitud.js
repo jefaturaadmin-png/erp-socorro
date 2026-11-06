@@ -16,24 +16,23 @@ const CLAVE_MIS = 'solicitudes-enviadas';
 const db = getFirestore(initializeApp(firebaseConfig));
 let CAT = [], CENTROS = [];
 const etq = p => `${p.n}`;
-const tipoSel = () => document.querySelector('input[name="sTipo"]:checked')?.value || 'ESCRITORIO';
-// Materiales del tipo elegido (k: E = escritorio, L = limpieza, vacío = ambos)
-const catTipo = () => { const k = tipoSel() === 'LIMPIEZA' ? 'L' : 'E'; return CAT.filter(p => !p.k || p.k === k); };
-function aplicarTipo() {
-  const lim = tipoSel() === 'LIMPIEZA';
-  $('sTit').textContent = `FORMATO DE CONSUMO DE MATERIALES DE ${lim ? 'LIMPIEZA' : 'ESCRITORIO'}`;
-  $('sNota').placeholder = lim ? 'Ej.: lejía en galonera, bolsas grandes' : 'Ej.: plumón delgado, vasos pequeños';
-  $('dlCat').innerHTML = catTipo().map(p => `<option value="${esc(etq(p))}">`).join('');
-}
-const buscar = txt => { const t = norm(txt); return t ? catTipo().find(p => norm(p.n) === t || norm(p.c) === t || norm(`${p.c} · ${p.n}`) === t) || null : null; };
+// Dos cuadros en la misma página: útiles de escritorio arriba y materiales de limpieza abajo
+const BLOQUES = [...document.querySelectorAll('.bloque')];
+const cuerpo = b => b.querySelector('[data-items]');
+const dlDe = b => b.dataset.tipo === 'LIMPIEZA' ? 'dlCatL' : 'dlCatE';
+// Materiales de cada tipo (k: E = escritorio, L = limpieza, vacío = ambos)
+const catDe = tipo => { const k = tipo === 'LIMPIEZA' ? 'L' : 'E'; return CAT.filter(p => !p.k || p.k === k); };
+const buscar = (txt, tipo) => { const t = norm(txt); return t ? catDe(tipo).find(p => norm(p.n) === t || norm(p.c) === t || norm(`${p.c} · ${p.n}`) === t) || null : null; };
 
-function fila(i) {
-  return `<tr><td class="c">${i + 1}</td><td><input data-f="desc" list="dlCat" maxlength="120" placeholder="Escribe o elige el material" aria-label="Material ${i + 1}"></td>
-    <td class="w-cant"><input data-f="cant" type="number" min="0" step="any" inputmode="decimal" aria-label="Cantidad ${i + 1}"></td><td class="w-uni"><input data-f="uni" list="dlUni" maxlength="20" placeholder="Unidad" aria-label="Unidad ${i + 1}"></td>
-    <td><button type="button" class="x" data-quitar aria-label="Quitar material ${i + 1}">×</button></td></tr>`;
+function fila(b, i) {
+  const q = b.dataset.tipo === 'LIMPIEZA' ? 'de limpieza ' : 'de escritorio ';
+  return `<tr><td class="c">${i + 1}</td><td><input data-f="desc" list="${dlDe(b)}" maxlength="120" placeholder="Escribe o elige el material" aria-label="Material ${q}${i + 1}"></td>
+    <td class="w-cant"><input data-f="cant" type="number" min="0" step="any" inputmode="decimal" aria-label="Cantidad ${q}${i + 1}"></td><td class="w-uni"><input data-f="uni" list="dlUni" maxlength="20" placeholder="Unidad" aria-label="Unidad ${q}${i + 1}"></td>
+    <td><button type="button" class="x" data-quitar aria-label="Quitar material ${q}${i + 1}">×</button></td></tr>`;
 }
-function renumerar() { [...$('sItems').rows].forEach((r, i) => { r.cells[0].textContent = i + 1; }); }
-function agregar(n = 1) { for (let k = 0; k < n; k++) $('sItems').insertAdjacentHTML('beforeend', fila($('sItems').rows.length)); }
+function renumerar(b) { [...cuerpo(b).rows].forEach((r, i) => { r.cells[0].textContent = i + 1; }); }
+function agregar(b, n = 1) { for (let k = 0; k < n; k++) cuerpo(b).insertAdjacentHTML('beforeend', fila(b, cuerpo(b).rows.length)); }
+function limpiarBloques() { BLOQUES.forEach(b => { cuerpo(b).innerHTML = ''; agregar(b, 3); }); }
 
 async function iniciar() {
   try {
@@ -44,65 +43,76 @@ async function iniciar() {
     if (CENTROS.filter(c => /^\d+$/.test(c.v) && c.t !== c.v).length < 2) CENTROS = CENTROS_COSTO.map(c => ({ v: c.codigo, t: `${c.codigo} · ${c.nombre}` }));
   } catch (e) { $('carga').className = 'aviso error'; $('carga').textContent = 'No se pudo conectar. Revisa tu internet y vuelve a cargar la página.'; return; }
   $('sCentro').innerHTML = '<option value="">— Elegir —</option>' + CENTROS.map(c => `<option value="${esc(c.v)}">${esc(c.t)}</option>`).join('');
-  const pedido = new URLSearchParams(location.search).get('tipo');
-  if (pedido && /limpieza/i.test(pedido)) document.querySelector('input[value="LIMPIEZA"]').checked = true;
-  aplicarTipo();
-  document.querySelectorAll('input[name="sTipo"]').forEach(r => r.addEventListener('change', () => { aplicarTipo(); [...$('sItems').rows].forEach(tr => { const p = buscar(tr.querySelector('[data-f="desc"]').value), u = tr.querySelector('[data-f="uni"]'); if (p && p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; } }); }));
+  $('dlCatE').innerHTML = catDe('ESCRITORIO').map(p => `<option value="${esc(etq(p))}">`).join('');
+  $('dlCatL').innerHTML = catDe('LIMPIEZA').map(p => `<option value="${esc(etq(p))}">`).join('');
   try { const g = localStorage.getItem('solicitud-datos'); if (g) { const x = JSON.parse(g); if (x.centro) $('sCentro').value = x.centro; if (x.nombre) $('sNombre').value = x.nombre; } } catch (e) { }
   $('sFecha').value = hoy();
-  agregar(5);
+  limpiarBloques();
   $('carga').hidden = true; $('fSol').hidden = false;
   pintarMis();
 }
 
-$('sAdd').addEventListener('click', () => { agregar(); $('sItems').lastElementChild.querySelector('input').focus(); });
-$('sItems').addEventListener('click', e => { if (e.target.closest('[data-quitar]')) { e.target.closest('tr').remove(); if (!$('sItems').rows.length) agregar(); renumerar(); } });
-$('sItems').addEventListener('input', e => {
-  if (e.target.dataset.f === 'uni') { delete e.target.dataset.auto; return; }
-  if (e.target.dataset.f !== 'desc') return;
-  const p = buscar(e.target.value), u = e.target.closest('tr').querySelector('[data-f="uni"]');
-  if (p && p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; }
+BLOQUES.forEach(b => {
+  b.querySelector('[data-add]').addEventListener('click', () => { agregar(b); cuerpo(b).lastElementChild.querySelector('input').focus(); });
+  cuerpo(b).addEventListener('click', e => { if (e.target.closest('[data-quitar]')) { e.target.closest('tr').remove(); if (!cuerpo(b).rows.length) agregar(b); renumerar(b); } });
+  cuerpo(b).addEventListener('input', e => {
+    if (e.target.dataset.f === 'uni') { delete e.target.dataset.auto; return; }
+    if (e.target.dataset.f !== 'desc') return;
+    const p = buscar(e.target.value, b.dataset.tipo), u = e.target.closest('tr').querySelector('[data-f="uni"]');
+    if (p && p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; }
+  });
 });
+const leerBloque = b => [...cuerpo(b).rows].map(r => {
+  const desc = limpio(r.querySelector('[data-f="desc"]').value).toUpperCase(), cant = Number(r.querySelector('[data-f="cant"]').value) || 0, p = buscar(desc, b.dataset.tipo);
+  const unidad = limpio(r.querySelector('[data-f="uni"]').value).toUpperCase();
+  return { desc: p ? p.n : desc, prodId: p ? p.i : null, codigo: p ? p.c : '', unidad, cant };
+}).filter(x => x.desc || x.cant);
 
 $('fSol').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = t => { $('sMsg').hidden = !t; $('sMsg').textContent = t || ''; };
   const centro = $('sCentro').value, nombre = limpio($('sNombre').value).toUpperCase(), fecha = $('sFecha').value;
-  const items = [...$('sItems').rows].map(r => {
-    const desc = limpio(r.querySelector('[data-f="desc"]').value).toUpperCase(), cant = Number(r.querySelector('[data-f="cant"]').value) || 0, p = buscar(desc);
-    const unidad = limpio(r.querySelector('[data-f="uni"]').value).toUpperCase();
-    return { desc: p ? p.n : desc, prodId: p ? p.i : null, codigo: p ? p.c : '', unidad, cant };
-  }).filter(x => x.desc || x.cant);
+  const pedidos = BLOQUES.map(b => ({ tipo: b.dataset.tipo, items: leerBloque(b) })).filter(x => x.items.length);
   if (!centro) return msg('Elige tu sucursal o centro de costo.');
   if (nombre.length < 3) return msg('Escribe tu nombre.');
   if (!fecha) return msg('Falta la fecha de solicitud.');
-  if (!items.length) return msg('Agrega al menos un material.');
-  if (items.some(x => !x.desc)) return msg('Hay una cantidad sin descripción del material.');
-  if (items.some(x => !(x.cant > 0))) return msg('Escribe la cantidad de cada material.');
-  if (items.some(x => !x.unidad)) return msg('Escribe la unidad de cada material (UND, PAQUETE, CAJA…).');
-  if (items.length > 40) return msg('Máximo 40 materiales por solicitud.');
+  if (!pedidos.length) return msg('Escribe al menos un material en útiles de escritorio o en materiales de limpieza.');
+  for (const x of pedidos) {
+    const q = x.tipo === 'LIMPIEZA' ? 'En materiales de limpieza' : 'En útiles de escritorio';
+    if (x.items.some(i => !i.desc)) return msg(`${q} hay una cantidad sin descripción del material.`);
+    if (x.items.some(i => !(i.cant > 0))) return msg(`${q} falta la cantidad de algún material.`);
+    if (x.items.some(i => !i.unidad)) return msg(`${q} falta la unidad de algún material (UND, PAQUETE, CAJA…).`);
+    if (x.items.length > 40) return msg(`${q} hay más de 40 materiales.`);
+  }
   msg('');
   const b = $('sEnviar'); b.disabled = true; b.textContent = 'Enviando…';
+  const hechos = [];
   try {
-    const ref = doc(collection(db, 'solicitudes'));
-    const cNombre = CENTROS.find(c => c.v === centro)?.t || centro;
-    const numero = await runTransaction(db, async tx => {
-      const cRef = doc(db, 'publico', 'contador'), c = await tx.get(cRef);
-      const n = (c.exists() ? c.data().n || 0 : 0) + 1;
-      tx.set(cRef, { n });
-      tx.set(ref, { numero: n, tipo: tipoSel(), fecha, mes: fecha.slice(0, 7), centro, centroNombre: cNombre, solicitante: nombre, nota: limpio($('sNota').value), items, estado: 'PENDIENTE', creadoMs: Date.now(), creado: serverTimestamp() });
-      return n;
-    });
+    const cNombre = CENTROS.find(c => c.v === centro)?.t || centro, nota = limpio($('sNota').value);
+    for (const x of pedidos) { // cada cuadro es su propia solicitud, con su número
+      const ref = doc(collection(db, 'solicitudes'));
+      const numero = await runTransaction(db, async tx => {
+        const cRef = doc(db, 'publico', 'contador'), c = await tx.get(cRef);
+        const n = (c.exists() ? c.data().n || 0 : 0) + 1;
+        tx.set(cRef, { n });
+        tx.set(ref, { numero: n, tipo: x.tipo, fecha, mes: fecha.slice(0, 7), centro, centroNombre: cNombre, solicitante: nombre, nota, items: x.items, estado: 'PENDIENTE', creadoMs: Date.now(), creado: serverTimestamp() });
+        return n;
+      });
+      hechos.push({ ...x, numero, id: ref.id });
+      const bl = BLOQUES.find(y => y.dataset.tipo === x.tipo); cuerpo(bl).innerHTML = ''; agregar(bl, 3); // ya enviado: se vacía ese cuadro
+    }
+    $('sNota').value = ''; $('sFecha').value = hoy();
+  } catch (err) { msg('No se pudo enviar' + (hechos.length ? ' todo' : '') + ': ' + (err?.message || err) + '. Inténtalo de nuevo.'); }
+  if (hechos.length) {
     try {
       localStorage.setItem('solicitud-datos', JSON.stringify({ centro, nombre }));
-      const mis = JSON.parse(localStorage.getItem(CLAVE_MIS) || '[]'); mis.unshift(ref.id); localStorage.setItem(CLAVE_MIS, JSON.stringify(mis.slice(0, 15)));
+      const mis = JSON.parse(localStorage.getItem(CLAVE_MIS) || '[]'); mis.unshift(...hechos.map(h => h.id).reverse()); localStorage.setItem(CLAVE_MIS, JSON.stringify(mis.slice(0, 15)));
     } catch (e2) { }
     $('sOk').hidden = false;
-    $('sOk').innerHTML = `<b>Solicitud N.º ${numero} (${tipoSel() === 'LIMPIEZA' ? 'limpieza' : 'escritorio'}) enviada.</b> Logística ya la puede ver. Guarda este número para cualquier consulta.`;
-    $('sItems').innerHTML = ''; agregar(5); $('sNota').value = ''; $('sFecha').value = hoy();
+    $('sOk').innerHTML = `<b>${hechos.map(h => `Solicitud N.º ${h.numero} (${h.tipo === 'LIMPIEZA' ? 'limpieza' : 'escritorio'})`).join(' y ')} enviada${hechos.length > 1 ? 's' : ''}.</b> Logística ya la${hechos.length > 1 ? 's' : ''} puede ver. Guarda ${hechos.length > 1 ? 'estos números' : 'este número'} para cualquier consulta.`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
     pintarMis();
-  } catch (err) { msg('No se pudo enviar: ' + (err?.message || err) + '. Inténtalo de nuevo.'); }
+  }
   b.disabled = false; b.textContent = 'Enviar solicitud';
 });
 
