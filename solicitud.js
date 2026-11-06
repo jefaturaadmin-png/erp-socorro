@@ -17,15 +17,14 @@ const etq = p => `${p.n}`;
 // Dos cuadros en la misma página: útiles de escritorio arriba y materiales de limpieza abajo
 const BLOQUES = [...document.querySelectorAll('.bloque')];
 const cuerpo = b => b.querySelector('[data-items]');
-const dlDe = b => b.dataset.tipo === 'LIMPIEZA' ? 'dlCatL' : 'dlCatE';
 // Materiales de cada tipo (k: E = escritorio, L = limpieza, vacío = ambos)
 const catDe = tipo => { const k = tipo === 'LIMPIEZA' ? 'L' : 'E'; return CAT.filter(p => !p.k || p.k === k); };
 const buscar = (txt, tipo) => { const t = norm(txt); return t ? catDe(tipo).find(p => norm(p.n) === t || norm(p.c) === t || norm(`${p.c} · ${p.n}`) === t) || null : null; };
 
 function fila(b, i) {
   const q = b.dataset.tipo === 'LIMPIEZA' ? 'de limpieza ' : 'de escritorio ';
-  return `<tr><td class="c">${i + 1}</td><td><input data-f="desc" list="${dlDe(b)}" maxlength="120" placeholder="Escribe o elige el material" aria-label="Material ${q}${i + 1}"></td>
-    <td class="w-cant"><input data-f="cant" type="number" min="0" step="any" inputmode="decimal" aria-label="Cantidad ${q}${i + 1}"></td><td class="w-uni"><input data-f="uni" list="dlUni" maxlength="20" placeholder="Unidad" aria-label="Unidad ${q}${i + 1}"></td>
+  return `<tr><td class="c">${i + 1}</td><td><input data-f="desc" autocomplete="off" maxlength="120" placeholder="Escribe para buscar el material" aria-label="Material ${q}${i + 1}"></td>
+    <td class="w-cant"><input data-f="cant" autocomplete="off" type="number" min="0" step="any" inputmode="decimal" aria-label="Cantidad ${q}${i + 1}"></td><td class="w-uni"><input data-f="uni" autocomplete="off" maxlength="20" placeholder="Unidad" aria-label="Unidad ${q}${i + 1}"></td>
     <td><button type="button" class="x" data-quitar aria-label="Quitar material ${q}${i + 1}">×</button></td></tr>`;
 }
 function renumerar(b) { [...cuerpo(b).rows].forEach((r, i) => { r.cells[0].textContent = i + 1; }); }
@@ -41,10 +40,8 @@ async function iniciar() {
     if (CENTROS.filter(c => /^\d+$/.test(c.v) && c.t !== c.v).length < 2) CENTROS = CENTROS_COSTO.map(c => ({ v: c.codigo, t: `${c.codigo} · ${c.nombre}` }));
   } catch (e) { $('carga').className = 'aviso error'; $('carga').textContent = 'No se pudo conectar. Revisa tu internet y vuelve a cargar la página.'; return; }
   $('sCentro').innerHTML = '<option value="">— Elegir —</option>' + CENTROS.map(c => `<option value="${esc(c.v)}">${esc(c.t)}</option>`).join('');
-  $('dlCatE').innerHTML = catDe('ESCRITORIO').map(p => `<option value="${esc(etq(p))}">`).join('');
-  $('dlCatL').innerHTML = catDe('LIMPIEZA').map(p => `<option value="${esc(etq(p))}">`).join('');
   try { const g = localStorage.getItem('solicitud-datos'); if (g) { const x = JSON.parse(g); if (x.centro) $('sCentro').value = x.centro; if (x.nombre) $('sNombre').value = x.nombre; } } catch (e) { }
-  $('sFecha').value = hoy();
+  ponerFecha();
   limpiarBloques();
   $('carga').hidden = true; $('fSol').hidden = false;
 }
@@ -53,17 +50,75 @@ BLOQUES.forEach(b => {
   b.querySelector('[data-add]').addEventListener('click', () => { agregar(b); cuerpo(b).lastElementChild.querySelector('input').focus(); });
   cuerpo(b).addEventListener('click', e => { if (e.target.closest('[data-quitar]')) { e.target.closest('tr').remove(); if (!cuerpo(b).rows.length) agregar(b); renumerar(b); } });
   cuerpo(b).addEventListener('input', e => {
-    if (e.target.dataset.f === 'uni') { delete e.target.dataset.auto; return; }
+    if (e.target.dataset.f === 'uni') { delete e.target.dataset.auto; abrirSug(e.target, b); return; }
     if (e.target.dataset.f !== 'desc') return;
+    abrirSug(e.target, b);
     const p = buscar(e.target.value, b.dataset.tipo), u = e.target.closest('tr').querySelector('[data-f="uni"]');
     if (p && p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; }
   });
 });
+// Fecha de solicitud: la del día, no se puede cambiar
+function ponerFecha() { $('sFecha').value = hoy().split('-').reverse().join('/'); }
+
+// Buscador: mientras se escribe aparecen solo los materiales (o unidades) que coinciden; no es una lista desplegable
+const UNIDADES = ['UND', 'PAQUETE', 'CAJA', 'ROLLO', 'BOLSA', 'DOCENA', 'CIENTO', 'MILLAR', 'PAR', 'JUEGO', 'FRASCO', 'BOTELLA', 'GALÓN', 'LITRO', 'KG', 'METRO'];
+const SUG = { el: null, inp: null, b: null, ops: [], act: -1 };
+SUG.el = document.createElement('div'); SUG.el.className = 'sug'; SUG.el.hidden = true; SUG.el.setAttribute('role', 'listbox'); document.body.appendChild(SUG.el);
+function cerrarSug() { SUG.el.hidden = true; SUG.inp = null; SUG.ops = []; SUG.act = -1; }
+function abrirSug(inp, b) {
+  const t = norm(inp.value), palabras = t.split(' ').filter(Boolean), esUni = inp.dataset.f === 'uni';
+  if (!palabras.length) return cerrarSug();
+  const base = esUni ? UNIDADES.map(u => ({ n: u })) : catDe(b.dataset.tipo);
+  const ops = base.filter(p => { const n = norm(p.n); return palabras.every(w => n.includes(w)); })
+    .sort((x, y) => (norm(y.n).startsWith(t) - norm(x.n).startsWith(t)) || x.n.localeCompare(y.n, 'es')).slice(0, 10);
+  if (ops.length === 1 && norm(ops[0].n) === t) return cerrarSug(); // ya está escrito completo
+  Object.assign(SUG, { inp, b, ops, act: ops.length ? 0 : -1 });
+  // resalta en negrita lo que coincide con lo escrito
+  const marca = n => {
+    const nn = norm(n); if (nn.length !== n.length) return esc(n);
+    const on = Array(n.length).fill(false);
+    palabras.forEach(w => { const i = nn.indexOf(w); if (i >= 0) for (let k = i; k < i + w.length; k++) on[k] = true; });
+    let h = '', ab = false;
+    for (let k = 0; k < n.length; k++) { if (on[k] !== ab) { h += ab ? '</b>' : '<b>'; ab = on[k]; } h += esc(n[k]); }
+    return h + (ab ? '</b>' : '');
+  };
+  SUG.el.innerHTML = ops.length ? ops.map((p, i) => `<div role="option" data-i="${i}" class="${i === SUG.act ? 'act' : ''}"><span>${marca(p.n)}</span>${p.u ? `<small>${esc(p.u)}</small>` : ''}</div>`).join('')
+    : (esUni ? '' : '<div class="vacia">No está en la lista: se enviará tal como lo escribiste</div>');
+  if (!SUG.el.innerHTML) return cerrarSug();
+  const r = inp.getBoundingClientRect();
+  Object.assign(SUG.el.style, { left: (r.left + scrollX) + 'px', top: (r.bottom + scrollY + 2) + 'px', width: Math.max(r.width, esUni ? 140 : 280) + 'px' });
+  SUG.el.hidden = false;
+}
+function elegirSug(i) {
+  const p = SUG.ops[i], inp = SUG.inp; if (!p || !inp) return;
+  inp.value = p.n;
+  if (inp.dataset.f === 'uni') delete inp.dataset.auto;
+  else { const u = inp.closest('tr').querySelector('[data-f="uni"]'); if (p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; } }
+  cerrarSug();
+  inp.closest('tr').querySelector('[data-f="cant"]').focus(); // sigue con la cantidad
+}
+function sugTeclado(e, inp) {
+  if (SUG.el.hidden || SUG.inp !== inp) return false;
+  if (e.key === 'Escape') { e.preventDefault(); cerrarSug(); return true; }
+  if (!SUG.ops.length) return false;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); SUG.act = (SUG.act + (e.key === 'ArrowDown' ? 1 : -1) + SUG.ops.length) % SUG.ops.length;
+    [...SUG.el.children].forEach((d, i) => d.classList.toggle('act', i === SUG.act)); SUG.el.children[SUG.act]?.scrollIntoView({ block: 'nearest' });
+    return true;
+  }
+  if ((e.key === 'Enter' || e.key === 'Tab') && SUG.act >= 0) { e.preventDefault(); elegirSug(SUG.act); return true; }
+  return false;
+}
+SUG.el.addEventListener('mousedown', e => { const d = e.target.closest('[data-i]'); e.preventDefault(); if (d) elegirSug(+d.dataset.i); });
+document.addEventListener('focusin', e => { if (SUG.inp && e.target !== SUG.inp) cerrarSug(); });
+window.addEventListener('resize', cerrarSug);
+
 // Teclado como en Excel: ↑ ↓ (o Enter) pasan a la misma columna de la fila de arriba o de abajo, también entre cuadros
 const todasLasFilas = () => BLOQUES.flatMap(b => [...cuerpo(b).rows]);
 $('fSol').addEventListener('keydown', e => {
   const inp = e.target.closest('[data-items] input');
   if (!inp) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault(); return; } // Enter no envía sin querer
+  if (sugTeclado(e, inp)) return;
   if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key) || e.altKey || e.ctrlKey || e.metaKey) return;
   e.preventDefault();
   const filas = todasLasFilas(), i = filas.indexOf(inp.closest('tr')), j = e.key === 'ArrowUp' ? i - 1 : i + 1;
@@ -81,11 +136,10 @@ const leerBloque = b => [...cuerpo(b).rows].map(r => {
 $('fSol').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = t => { $('sMsg').hidden = !t; $('sMsg').textContent = t || ''; };
-  const centro = $('sCentro').value, nombre = limpio($('sNombre').value).toUpperCase(), fecha = $('sFecha').value;
+  const centro = $('sCentro').value, nombre = limpio($('sNombre').value).toUpperCase(), fecha = hoy(); // siempre la fecha del día en que se envía
   const pedidos = BLOQUES.map(b => ({ tipo: b.dataset.tipo, items: leerBloque(b) })).filter(x => x.items.length);
   if (!centro) return msg('Elige tu sucursal o centro de costo.');
   if (nombre.length < 3) return msg('Escribe tu nombre.');
-  if (!fecha) return msg('Falta la fecha de solicitud.');
   if (!pedidos.length) return msg('Escribe al menos un material en útiles de escritorio o en materiales de limpieza.');
   for (const x of pedidos) {
     const q = x.tipo === 'LIMPIEZA' ? 'En materiales de limpieza' : 'En útiles de escritorio';
@@ -110,7 +164,7 @@ $('fSol').addEventListener('submit', async e => {
       hechos.push({ ...x, numero, id: ref.id });
       const bl = BLOQUES.find(y => y.dataset.tipo === x.tipo); cuerpo(bl).innerHTML = ''; agregar(bl, 3); // ya enviado: se vacía ese cuadro
     }
-    $('sNota').value = ''; $('sFecha').value = hoy();
+    $('sNota').value = ''; ponerFecha();
   } catch (err) { msg('No se pudo enviar' + (hechos.length ? ' todo' : '') + ': ' + (err?.message || err) + '. Inténtalo de nuevo.'); }
   if (hechos.length) {
     try {

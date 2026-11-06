@@ -39,6 +39,16 @@ td.c{text-align:center;color:var(--gris);width:28px}
 .pill.ATENDIDA{background:var(--ok-f);color:var(--ok)}
 .pill.RECHAZADA{background:var(--rojo-f);color:var(--rojo)}
 [hidden]{display:none!important}
+input[readonly]{background:#f3f1ee;color:var(--gris);cursor:default}
+input[readonly]:focus{outline:none;border-color:var(--borde)}
+/* Buscador de materiales: aparece mientras se escribe */
+.sug{position:absolute;z-index:20;background:#fff;border:1px solid var(--pri);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:280px;overflow:auto;padding:4px 0}
+.sug div{padding:8px 12px;cursor:pointer;font-size:13.5px;display:flex;justify-content:space-between;gap:12px}
+.sug div small{color:var(--gris);white-space:nowrap}
+.sug div.act,.sug div:hover{background:var(--suave)}
+.sug b{color:var(--pri)}
+.sug .vacia{color:var(--gris);cursor:default;font-style:italic}
+.sug .vacia:hover{background:none}
 .bloque{border:1px solid var(--borde);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
 .bloque[data-tipo="ESCRITORIO"]{border-left:5px solid var(--pri)}
 .bloque[data-tipo="LIMPIEZA"]{border-left:5px solid #2f7fb8}
@@ -56,27 +66,24 @@ td.c{text-align:center;color:var(--gris);width:28px}
     <div class="g3">
       <label>Sucursal / centro de costo<select id="sCentro" required><option value="">— Elegir —</option></select></label>
       <label>Solicitado por<input id="sNombre" maxlength="80" required autocomplete="name" placeholder="Nombre y apellido"></label>
-      <label>Fecha de solicitud<input id="sFecha" type="date" required></label>
+      <label>Fecha de solicitud<input id="sFecha" readonly tabindex="-1" aria-readonly="true" title="Se pone sola con la fecha de hoy"></label>
     </div>
     <p class="nota">Llena solo el cuadro que necesites, o los dos. Cada cuadro se envía como su propia solicitud.</p>
     <section class="bloque" data-tipo="ESCRITORIO">
       <h3>✏️ Útiles de escritorio</h3>
       <table><thead><tr><th>#</th><th>Descripción del material</th><th class="w-cant">Cantidad</th><th class="w-uni">Unidad</th><th></th></tr></thead><tbody data-items></tbody></table>
-      <datalist id="dlCatE"></datalist>
       <div><button type="button" class="btn sec" data-add>+ Agregar útil de escritorio</button></div>
     </section>
     <section class="bloque" data-tipo="LIMPIEZA">
       <h3>🧽 Materiales de limpieza</h3>
       <table><thead><tr><th>#</th><th>Descripción del material</th><th class="w-cant">Cantidad</th><th class="w-uni">Unidad</th><th></th></tr></thead><tbody data-items></tbody></table>
-      <datalist id="dlCatL"></datalist>
       <div><button type="button" class="btn sec" data-add>+ Agregar material de limpieza</button></div>
     </section>
-    <datalist id="dlUni"><option value="UND"><option value="PAQUETE"><option value="CAJA"><option value="ROLLO"><option value="BOLSA"><option value="DOCENA"><option value="CIENTO"><option value="MILLAR"><option value="PAR"><option value="JUEGO"><option value="FRASCO"><option value="BOTELLA"><option value="GALÓN"><option value="LITRO"><option value="KG"><option value="METRO"></datalist>
     <label>Comentario (opcional)<input id="sNota" maxlength="200" placeholder="Ej.: plumón delgado, lejía en galonera"></label>
     <div class="aviso error" id="sMsg" hidden></div>
     <div class="acc"><p class="nota">Administración revisará tu pedido y te avisará cuando esté listo para entregar.</p><button type="submit" class="btn" id="sEnviar">Enviar solicitud</button></div>
   </form>
 </main>
-<script type="module" src="solicitud.js?v=2026.11.06r"></script>
+<script type="module" src="solicitud.js?v=2026.11.06s"></script>
 </body>
 </html>
