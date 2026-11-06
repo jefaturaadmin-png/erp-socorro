@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta http-equiv="Cache-Control" content="no-cache">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Solicitud de materiales · Farmacia Socorro</title>
@@ -11,10 +11,6 @@
 :root{--marca:#fe6e00;--pri:#d95a00;--pri-osc:#b84c00;--suave:#fff0e0;--suave2:#fffaf4;--fondo:#f7f5f2;--blanco:#fff;--borde:#e3e0dd;--texto:#2b2f33;--gris:#6b6f73;--rojo:#b3261e;--rojo-f:#fdecea;--ok:#1b7a4b;--ok-f:#e6f4ec;--ambar:#8a5300;--ambar-f:#fff4dc}
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--fondo);color:var(--texto);font-size:14px}
-.top{background:var(--marca);color:#fff;display:flex;align-items:center;gap:12px;padding:10px 16px}
-.top img{width:36px;height:36px;background:#fff;border-radius:8px;padding:3px}
-.top h1{font-size:17px;margin:0}
-.top small{display:block;font-weight:normal;opacity:.9;font-size:12px}
 main{max-width:900px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px}
 .caja{background:var(--blanco);border:1px solid var(--borde);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
 h2{margin:0;font-size:18px;text-align:center;letter-spacing:.5px}
@@ -52,7 +48,6 @@ td.c{text-align:center;color:var(--gris);width:28px}
 </style>
 </head>
 <body>
-<header class="top"><img src="logo.png" alt=""><h1>Farmacia Socorro<small>Solicitud de materiales</small></h1></header>
 <main>
   <div class="aviso" id="carga">Cargando…</div>
   <div class="aviso ok" id="sOk" hidden></div>
@@ -82,6 +77,6 @@ td.c{text-align:center;color:var(--gris);width:28px}
     <div class="acc"><p class="nota">Administración revisará tu pedido y te avisará cuando esté listo para entregar.</p><button type="submit" class="btn" id="sEnviar">Enviar solicitud</button></div>
   </form>
 </main>
-<script type="module" src="solicitud.js?v=2026.11.06p"></script>
+<script type="module" src="solicitud.js?v=2026.11.06q"></script>
 </body>
 </html>
