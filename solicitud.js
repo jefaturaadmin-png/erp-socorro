@@ -29,7 +29,7 @@ const buscar = txt => { const t = norm(txt); return t ? catTipo().find(p => norm
 
 function fila(i) {
   return `<tr><td class="c">${i + 1}</td><td><input data-f="desc" list="dlCat" maxlength="120" placeholder="Escribe o elige el material" aria-label="Material ${i + 1}"></td>
-    <td class="w-cant"><input data-f="cant" type="number" min="0" step="any" inputmode="decimal" aria-label="Cantidad ${i + 1}"></td><td class="w-uni" data-c="uni"></td>
+    <td class="w-cant"><input data-f="cant" type="number" min="0" step="any" inputmode="decimal" aria-label="Cantidad ${i + 1}"></td><td class="w-uni"><input data-f="uni" list="dlUni" maxlength="20" placeholder="Unidad" aria-label="Unidad ${i + 1}"></td>
     <td><button type="button" class="x" data-quitar aria-label="Quitar material ${i + 1}">×</button></td></tr>`;
 }
 function renumerar() { [...$('sItems').rows].forEach((r, i) => { r.cells[0].textContent = i + 1; }); }
@@ -47,7 +47,7 @@ async function iniciar() {
   const pedido = new URLSearchParams(location.search).get('tipo');
   if (pedido && /limpieza/i.test(pedido)) document.querySelector('input[value="LIMPIEZA"]').checked = true;
   aplicarTipo();
-  document.querySelectorAll('input[name="sTipo"]').forEach(r => r.addEventListener('change', () => { aplicarTipo(); [...$('sItems').rows].forEach(tr => { const p = buscar(tr.querySelector('[data-f="desc"]').value); tr.querySelector('[data-c="uni"]').textContent = p ? p.u : ''; }); }));
+  document.querySelectorAll('input[name="sTipo"]').forEach(r => r.addEventListener('change', () => { aplicarTipo(); [...$('sItems').rows].forEach(tr => { const p = buscar(tr.querySelector('[data-f="desc"]').value), u = tr.querySelector('[data-f="uni"]'); if (p && p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; } }); }));
   try { const g = localStorage.getItem('solicitud-datos'); if (g) { const x = JSON.parse(g); if (x.centro) $('sCentro').value = x.centro; if (x.nombre) $('sNombre').value = x.nombre; } } catch (e) { }
   $('sFecha').value = hoy();
   agregar(5);
@@ -58,8 +58,10 @@ async function iniciar() {
 $('sAdd').addEventListener('click', () => { agregar(); $('sItems').lastElementChild.querySelector('input').focus(); });
 $('sItems').addEventListener('click', e => { if (e.target.closest('[data-quitar]')) { e.target.closest('tr').remove(); if (!$('sItems').rows.length) agregar(); renumerar(); } });
 $('sItems').addEventListener('input', e => {
+  if (e.target.dataset.f === 'uni') { delete e.target.dataset.auto; return; }
   if (e.target.dataset.f !== 'desc') return;
-  const p = buscar(e.target.value); e.target.closest('tr').querySelector('[data-c="uni"]').textContent = p ? p.u : '';
+  const p = buscar(e.target.value), u = e.target.closest('tr').querySelector('[data-f="uni"]');
+  if (p && p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; }
 });
 
 $('fSol').addEventListener('submit', async e => {
@@ -68,7 +70,8 @@ $('fSol').addEventListener('submit', async e => {
   const centro = $('sCentro').value, nombre = limpio($('sNombre').value).toUpperCase(), fecha = $('sFecha').value;
   const items = [...$('sItems').rows].map(r => {
     const desc = limpio(r.querySelector('[data-f="desc"]').value).toUpperCase(), cant = Number(r.querySelector('[data-f="cant"]').value) || 0, p = buscar(desc);
-    return { desc: p ? p.n : desc, prodId: p ? p.i : null, codigo: p ? p.c : '', unidad: p ? p.u : '', cant };
+    const unidad = limpio(r.querySelector('[data-f="uni"]').value).toUpperCase();
+    return { desc: p ? p.n : desc, prodId: p ? p.i : null, codigo: p ? p.c : '', unidad, cant };
   }).filter(x => x.desc || x.cant);
   if (!centro) return msg('Elige tu sucursal o centro de costo.');
   if (nombre.length < 3) return msg('Escribe tu nombre.');
@@ -76,6 +79,7 @@ $('fSol').addEventListener('submit', async e => {
   if (!items.length) return msg('Agrega al menos un material.');
   if (items.some(x => !x.desc)) return msg('Hay una cantidad sin descripción del material.');
   if (items.some(x => !(x.cant > 0))) return msg('Escribe la cantidad de cada material.');
+  if (items.some(x => !x.unidad)) return msg('Escribe la unidad de cada material (UND, PAQUETE, CAJA…).');
   if (items.length > 40) return msg('Máximo 40 materiales por solicitud.');
   msg('');
   const b = $('sEnviar'); b.disabled = true; b.textContent = 'Enviando…';
