@@ -209,7 +209,9 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 .seg button{background:var(--blanco);color:var(--pri);border:0;padding:5px 12px;cursor:pointer;font-size:12.5px}
 .seg button+button{border-left:1px solid var(--pri)}
 .seg button.act{background:var(--pri);color:#fff}
-.tk-tab thead th{background:var(--suave);text-align:center;vertical-align:middle}
+.tk-tab thead{position:sticky;top:0;z-index:2;background:var(--suave)}
+.tk-tab thead tr{background:var(--suave)}
+.tk-tab thead th{position:static;background:var(--suave);text-align:center;vertical-align:middle;box-shadow:inset 0 -1px 0 var(--borde)}
 .tk-tab thead th.num{text-align:right}
 .tk-tab th.tk-grupo{background:#f6c08f;color:#5a2a00;letter-spacing:1px}
 .tk-tab td.tk-ent{color:var(--ok);font-weight:bold}
@@ -609,6 +611,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.06d"></script>
+<script type="module" src="app.js?v=2026.11.06e"></script>
 </body>
 </html>
