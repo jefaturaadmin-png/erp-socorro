@@ -59,6 +59,19 @@ BLOQUES.forEach(b => {
     if (p && p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; }
   });
 });
+// Teclado como en Excel: ↑ ↓ (o Enter) pasan a la misma columna de la fila de arriba o de abajo, también entre cuadros
+const todasLasFilas = () => BLOQUES.flatMap(b => [...cuerpo(b).rows]);
+$('fSol').addEventListener('keydown', e => {
+  const inp = e.target.closest('[data-items] input');
+  if (!inp) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault(); return; } // Enter no envía sin querer
+  if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key) || e.altKey || e.ctrlKey || e.metaKey) return;
+  e.preventDefault();
+  const filas = todasLasFilas(), i = filas.indexOf(inp.closest('tr')), j = e.key === 'ArrowUp' ? i - 1 : i + 1;
+  if (j < 0) return;
+  if (j >= filas.length) { const b = inp.closest('.bloque'); agregar(b); }
+  const destino = todasLasFilas()[j].querySelector(`[data-f="${inp.dataset.f}"]`);
+  destino.focus(); destino.select?.();
+});
 const leerBloque = b => [...cuerpo(b).rows].map(r => {
   const desc = limpio(r.querySelector('[data-f="desc"]').value).toUpperCase(), cant = Number(r.querySelector('[data-f="cant"]').value) || 0, p = buscar(desc, b.dataset.tipo);
   const unidad = limpio(r.querySelector('[data-f="uni"]').value).toUpperCase();
