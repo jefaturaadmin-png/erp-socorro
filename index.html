@@ -346,11 +346,12 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
         <div class="aviso" id="solLink"></div>
         <div class="filtros">
           <label>Estado<select id="solEstado"><option value="PENDIENTE">Pendientes</option><option value="ATENDIDA">Entregadas</option><option value="RECHAZADA">Rechazadas</option><option value="">Todas (del mes)</option></select></label>
-          <label>Mes<input type="month" id="solMes"></label>
+          <label>Tipo<select id="solTipo"><option value="">Escritorio y limpieza</option><option value="ESCRITORIO">Útiles de escritorio</option><option value="LIMPIEZA">Materiales de limpieza</option></select></label>
+        <label>Mes<input type="month" id="solMes"></label>
           <label class="crece">Buscar<input type="search" id="solBuscar" placeholder="N.º, sucursal, solicitante o material"></label>
         </div>
         <div class="resumen" id="solRes"></div>
-        <div class="tabla"><table><thead><tr><th>N.º</th><th>Fecha</th><th>Sucursal / centro de costo</th><th>Solicitado por</th><th>Materiales</th><th>Estado</th><th></th></tr></thead><tbody id="solFilas"><tr><td colspan="7" class="vacio">Cargando…</td></tr></tbody></table></div>
+        <div class="tabla"><table><thead><tr><th>N.º</th><th>Fecha</th><th>Tipo</th><th>Sucursal / centro de costo</th><th>Solicitado por</th><th>Materiales</th><th>Estado</th><th></th></tr></thead><tbody id="solFilas"><tr><td colspan="8" class="vacio">Cargando…</td></tr></tbody></table></div>
       </section>
       <section id="m-salidas" class="mod" hidden>
         <div class="cab"><div><h2>Salida de materiales</h2><p class="nota">Entregas a cada área o centro de costos. Cada salida descuenta el stock del kardex a costo promedio.</p></div>
@@ -567,7 +568,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
         <label>Fecha<input id="mFecha" type="date" required></label>
         <label>Cantidad<input id="mCant" type="number" step="any" min="0" required></label>
         <label id="mCostoL" hidden>Costo unitario sin IGV<input id="mCosto" type="number" step="any" min="0"></label>
-        <label>Destino / área<select id="mDestino"></select></label>
+        <label>Centro de costo<select id="mDestino"></select></label>
         <label>Entregado a (opcional)<input id="mPersona" list="dlPersonal"></label>
         <label class="s2">Motivo / documento<input id="mMotivo" maxlength="200" required></label>
       </div>
@@ -645,6 +646,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.06i"></script>
+<script type="module" src="app.js?v=2026.11.06j"></script>
 </body>
 </html>

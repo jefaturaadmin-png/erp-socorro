@@ -10,7 +10,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06i'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.06j'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
@@ -50,6 +50,28 @@ const DESC_ROL = {
   CONSULTA: 'Solo mira servicios, compras y kardex'
 };
 const TIPOS_DOC = ['FACTURA', 'BOLETA', 'RECIBO POR HONORARIOS', 'NOTA DE CREDITO', 'NOTA DE DEBITO', 'TICKET', 'OTRO'];
+const CENTROS_COSTO = [
+  { codigo: '101', nombre: 'FARMACIA SOCORRO REAL' },
+  { codigo: '102', nombre: 'FARMACIA SOCORRO 2' },
+  { codigo: '103', nombre: 'FARMACIA SOCORRO HUANCAS' },
+  { codigo: '104', nombre: 'FARMACIA SOCORRO LOS HEROES' },
+  { codigo: '105', nombre: 'FARMACIA SOCORRO MERCADO' },
+  { codigo: '106', nombre: 'FARMACIA SOCORRO ORTEGA' },
+  { codigo: '107', nombre: 'FARMACIA SOCORRO PARRA' },
+  { codigo: '108', nombre: 'FARMACIA SOCORRO SUMAR' },
+  { codigo: '109', nombre: 'FARMACIA SOCORRO TUPAC' },
+  { codigo: '110', nombre: 'FS CONCEPCION' },
+  { codigo: '111', nombre: 'SOCORRO BEAUTY' },
+  { codigo: '112', nombre: 'SOCORRO HUANUCO' },
+  { codigo: '113', nombre: 'SOCORRO LIBERTAD' },
+  { codigo: '114', nombre: 'SOCORRO MERCADO TAMBO' },
+  { codigo: '115', nombre: 'SOCORRO PIOPATA' },
+  { codigo: '116', nombre: 'SOCORRO PARRA REAL' },
+  { codigo: '117', nombre: 'CENTENARIO / WESTERN' },
+  { codigo: '118', nombre: 'DROGUERIA' },
+  { codigo: '119', nombre: 'ADMINISTRATIVO' },
+  { codigo: '120', nombre: 'ANDALUZ' }
+];
 const DEF_LISTAS = {
   empresas: [{ nombre: 'FS SOCORRO S.A.C.', ruc: '20486562341' }, { nombre: 'FS INNOVA SOCORRO', ruc: '' }, { nombre: 'HEALTH PREVENTIVE', ruc: '' }],
   areas: ['ADMINISTRACIÓN', 'LOGÍSTICA', 'DROGUERÍA FS', 'REAL', 'MERCADO', 'TUPAC', 'ORTEGA', 'HUANCAS', 'HEROES', 'MCDO. TAMBO', 'PARRA', 'SUMAR', 'PUNO', 'PIOPATA', 'CONCEPCIÓN', 'LIBERTAD', 'ANDALUZ'],
@@ -57,7 +79,7 @@ const DEF_LISTAS = {
   formas: ['TRANSFERENCIA BCP', 'TRANSFERENCIA BBVA', 'TRANSFERENCIA INTERBANK', 'EFECTIVO', 'YAPE / PLIN', 'CHEQUE'],
   condiciones: ['CONTADO', '7 DIAS CREDITO', '15 DIAS CREDITO', '30 DIAS CREDITO', '45 DIAS CREDITO', '60 DIAS CREDITO'],
   unidades: ['UND', 'CAJA', 'PAQUETE', 'BOLSA', 'KG', 'LITRO', 'GALÓN', 'METRO', 'PAR', 'JUEGO', 'ROLLO', 'MILLAR'],
-  codigosCC: [{ codigo: '101', nombre: 'ADMINISTRACIÓN' }],
+  codigosCC: CENTROS_COSTO,
   cargos: ['QUÍMICO FARMACÉUTICO', 'TÉCNICO EN FARMACIA', 'CAJERO(A)', 'ALMACENERO', 'ASISTENTE ADMINISTRATIVO', 'ASISTENTE DE LOGÍSTICA', 'JEFE DE LOGÍSTICA', 'CONTADOR(A)', 'GERENTE']
 };
 const PROMPT_IA = `Eres un asistente contable en Perú. Lee este comprobante de pago (factura, boleta, recibo por honorarios, nota de crédito, etc.) y devuelve SOLO un objeto JSON con esta forma exacta:
@@ -164,6 +186,11 @@ async function cargarBase() {
   const [l, ia] = await Promise.all([getDoc(doc(db, 'config', 'listas')).catch(() => null), getDoc(doc(db, 'config', 'ia')).catch(() => null)]);
   LISTAS = structuredClone(DEF_LISTAS);
   if (l && l.exists()) Object.assign(LISTAS, l.data());
+  // Primera vez con los centros de costo oficiales: reemplazan a la lista antigua (solo tenía el 101)
+  if ((LISTAS.codigosCC || []).length <= 1) {
+    LISTAS.codigosCC = CENTROS_COSTO;
+    if (YO?.rol === 'ADMIN') setDoc(doc(db, 'config', 'listas'), { codigosCC: CENTROS_COSTO }, { merge: true }).catch(e => console.warn('centros de costo', e));
+  }
   IA = ia && ia.exists() ? ia.data() : null;
   $('dlUni').innerHTML = LISTAS.unidades.map(u => `<option value="${esc(u)}">`).join('');
   $('dlCargos').innerHTML = LISTAS.cargos.map(u => `<option value="${esc(u)}">`).join('');
@@ -1356,6 +1383,7 @@ $('impOk').addEventListener('click', async () => {
 let catPublicado = null, catTimer = null;
 function centrosPublicos() {
   const l = (LISTAS.codigosCC || []).map(c => ({ v: c.codigo, t: c.nombre ? `${c.codigo} · ${c.nombre}` : c.codigo }));
+  if (l.filter(c => c.t !== c.v).length >= 2) return l; // con los centros de costo oficiales basta
   const nombres = new Set((LISTAS.codigosCC || []).map(c => norm(c.nombre)));
   LISTAS.areas.forEach(a => { if (!nombres.has(norm(a))) l.push({ v: a, t: a }); });
   return l;
@@ -1365,7 +1393,7 @@ function sincronizarCatalogo() {
   clearTimeout(catTimer);
   catTimer = setTimeout(async () => {
     try {
-      const datos = { items: [...PRODUCTOS.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(p => ({ i: p.id, c: p.codigo, n: p.nombre, u: p.unidad || '' })), centros: centrosPublicos() };
+      const datos = { items: [...PRODUCTOS.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(p => ({ i: p.id, c: p.codigo, n: p.nombre, u: p.unidad || '', k: /LIMPIEZA/i.test(p.categoria || '') ? 'L' : /ESCRITORIO|OFICINA/i.test(p.categoria || '') ? 'E' : '' })), centros: centrosPublicos() };
       const txt = JSON.stringify(datos);
       if (catPublicado === null) { const s = await getDoc(doc(db, 'publico', 'catalogo')); catPublicado = s.exists() ? JSON.stringify({ items: s.data().items || [], centros: s.data().centros || [] }) : ''; }
       if (txt === catPublicado) return;
@@ -1386,34 +1414,37 @@ function abrirSolicitudes() {
 async function cargarSolicitudes() {
   const est = $('solEstado').value; let mes = $('solMes').value;
   if (!est && !mes) { mes = mesISO(); $('solMes').value = mes; }
-  $('solFilas').innerHTML = '<tr><td colspan="7" class="vacio">Cargando…</td></tr>';
+  $('solFilas').innerHTML = '<tr><td colspan="8" class="vacio">Cargando…</td></tr>';
   try {
     const q = est ? query(collection(db, 'solicitudes'), where('estado', '==', est)) : query(collection(db, 'solicitudes'), where('mes', '==', mes));
     const s = await getDocs(q);
     SOLS.lista = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !mes || x.mes === mes).sort((a, b) => (b.numero || 0) - (a.numero || 0));
     pintarSolicitudes();
-  } catch (e) { $('solFilas').innerHTML = `<tr><td colspan="7"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
+  } catch (e) { $('solFilas').innerHTML = `<tr><td colspan="8"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
 }
 const estSol = e => e === 'ATENDIDA' ? 'ENTREGADA' : e;
 function filtrarSolicitudes() {
   const q = norm($('solBuscar').value);
-  return SOLS.lista.filter(x => !q || norm([x.numero, x.centroNombre, x.solicitante, ...(x.items || []).map(i => i.desc)].join(' ')).includes(q));
+  const t = $('solTipo').value;
+  return SOLS.lista.filter(x => (!t || (x.tipo || 'ESCRITORIO') === t) && (!q || norm([x.numero, x.centroNombre, x.solicitante, ...(x.items || []).map(i => i.desc)].join(' ')).includes(q)));
 }
 function pintarSolicitudes() {
   const l = filtrarSolicitudes(), op = puede('kardex');
   $('solRes').innerHTML = `<span><b>${l.length}</b> solicitudes</span><span>Pendientes: <b>${l.filter(x => x.estado === 'PENDIENTE').length}</b></span>`;
-  $('solFilas').innerHTML = l.length ? l.map(x => `<tr><td><b>${x.numero}</b></td><td>${fmtF(x.fecha)}</td><td>${esc(x.centroNombre || x.centro)}</td><td>${esc(x.solicitante)}</td>
+  $('solFilas').innerHTML = l.length ? l.map(x => `<tr><td><b>${x.numero}</b></td><td>${fmtF(x.fecha)}</td><td><span class="pill ${x.tipo === 'LIMPIEZA' ? 'AJUSTE' : 'ENTRADA'}">${tipoSolTxt(x)}</span></td><td>${esc(x.centroNombre || x.centro)}</td><td>${esc(x.solicitante)}</td>
       <td>${(x.items || []).length} material(es)<br><small class="nota">${esc((x.items || []).slice(0, 3).map(i => `${i.desc} (${nq(i.cant)})`).join(', '))}${(x.items || []).length > 3 ? '…' : ''}</small>${x.nota ? `<br><small class="nota">“${esc(x.nota)}”</small>` : ''}</td>
       <td><span class="pill ${x.estado === 'ATENDIDA' ? 'APROBADO' : x.estado === 'RECHAZADA' ? 'RECHAZADO' : 'PENDIENTE'}">${esc(estSol(x.estado))}</span>${x.fechaEntrega ? `<br><small class="nota">${fmtF(x.fechaEntrega)}</small>` : ''}</td>
       <td><div class="acciones">${x.estado === 'PENDIENTE' && op ? `<button class="btn chico" data-sol="${esc(x.id)}">Atender</button>` : `<button class="btn sec chico" data-sol="${esc(x.id)}">Ver</button>`}<button class="btn sec chico" data-solimp="${esc(x.id)}">Imprimir</button></div></td></tr>`).join('')
-    : '<tr><td colspan="7" class="vacio">No hay solicitudes con este filtro.</td></tr>';
+    : '<tr><td colspan="8" class="vacio">No hay solicitudes con este filtro.</td></tr>';
 }
 $('solEstado').addEventListener('change', () => { if ($('solEstado').value === 'PENDIENTE') $('solMes').value = ''; cargarSolicitudes(); });
 $('solMes').addEventListener('change', cargarSolicitudes);
 $('solBuscar').addEventListener('input', pintarSolicitudes);
+$('solTipo').addEventListener('change', pintarSolicitudes);
+const tipoSolTxt = x => x.tipo === 'LIMPIEZA' ? 'LIMPIEZA' : 'ESCRITORIO';
 $('solCsv').addEventListener('click', () => {
-  const f = [['N.º', 'Fecha solicitud', 'Sucursal', 'Solicitado por', 'Estado', 'Fecha entrega', 'Material pedido', 'Cant. pedida', 'Código', 'Material entregado', 'Cant. entregada', 'Costo unit.', 'Costo total', 'Recibido por', 'Entregado por']];
-  filtrarSolicitudes().forEach(x => (x.entrega || x.items || []).forEach(i => f.push([x.numero, fmtF(x.fecha), x.centroNombre || x.centro, x.solicitante, estSol(x.estado), fmtF(x.fechaEntrega), i.desc, String(i.cantSol ?? i.cant).replace('.', ','), i.codigo || '', i.producto || '', x.entrega ? String(i.cant).replace('.', ',') : '', x.entrega ? numCSV(i.cu) : '', x.entrega ? numCSV(i.ct) : '', x.recibidoPor || '', x.entregadoPor || ''])));
+  const f = [['N.º', 'Tipo', 'Fecha solicitud', 'Sucursal', 'Solicitado por', 'Estado', 'Fecha entrega', 'Material pedido', 'Cant. pedida', 'Código', 'Material entregado', 'Cant. entregada', 'Costo unit.', 'Costo total', 'Recibido por', 'Entregado por']];
+  filtrarSolicitudes().forEach(x => (x.entrega || x.items || []).forEach(i => f.push([x.numero, tipoSolTxt(x), fmtF(x.fecha), x.centroNombre || x.centro, x.solicitante, estSol(x.estado), fmtF(x.fechaEntrega), i.desc, String(i.cantSol ?? i.cant).replace('.', ','), i.codigo || '', i.producto || '', x.entrega ? String(i.cant).replace('.', ',') : '', x.entrega ? numCSV(i.cu) : '', x.entrega ? numCSV(i.ct) : '', x.recibidoPor || '', x.entregadoPor || ''])));
   descargarCSV(`solicitudes_${$('solMes').value || 'pendientes'}.csv`, f);
 });
 $('solFilas').addEventListener('click', e => {
@@ -1431,7 +1462,7 @@ function abrirSolicitud(x) {
     const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.producto || i.desc);
     return { desc: i.desc, cantSol: i.cantSol ?? i.cant, unidadSol: i.unidad || '', prodId: p?.id || null, entregar: x.entrega ? i.cant : (i.cant || 0), cu: i.cu };
   }) };
-  $('solTit').textContent = `Solicitud N.º ${x.numero} · ${x.centroNombre || x.centro}`;
+  $('solTit').textContent = `Solicitud N.º ${x.numero} · ${tipoSolTxt(x) === 'LIMPIEZA' ? 'Limpieza' : 'Escritorio'} · ${x.centroNombre || x.centro}`;
   $('solInfo').innerHTML = `Solicitado por <b>${esc(x.solicitante)}</b> el ${fmtF(x.fecha)} · Estado: <b>${esc(estSol(x.estado))}</b>${x.nota ? ` · Comentario: “${esc(x.nota)}”` : ''}${x.motivo ? ` · Motivo: ${esc(x.motivo)}` : ''}${x.atendidoPor ? ` · Registró: ${esc(x.atendidoPor)}` : ''}`;
   $('solFEnt').value = x.fechaEntrega || hoyISO(); $('solEntPor').value = x.entregadoPor || YO.nombre; $('solRecPor').value = x.recibidoPor || x.solicitante || '';
   ['solFEnt', 'solEntPor', 'solRecPor'].forEach(id => { $(id).disabled = !editable; });
@@ -1528,7 +1559,7 @@ function imprimirSolicitud(x, borrador) {
     .nota{color:#666;font-size:11px}
     @media print{body{margin:10mm}}
   </style></head><body>
-    <div class="cab"><h1>FORMATO DE CONSUMO DE MATERIALES DE ESCRITORIO</h1><img src="${esc(new URL('logo.png', location.href).href)}" alt=""></div>
+    <div class="cab"><h1>FORMATO DE CONSUMO DE MATERIALES DE ${tipoSolTxt(x)}</h1><img src="${esc(new URL('logo.png', location.href).href)}" alt=""></div>
     <div class="datos">
       <div>Fecha de solicitud <b>${fmtF(x.fecha)}</b></div><div>N.º correlativo <b>${x.numero}</b></div>
       <div>Fecha de entrega <b>${fmtF(borrador ? $('solFEnt').value : x.fechaEntrega) || '&nbsp;'}</b></div><div>Centro de costo <b>${esc(x.centroNombre || x.centro)}</b></div>
@@ -1589,7 +1620,8 @@ $('sFilas').addEventListener('click', async e => {
 /* Salidas y ajustes */
 $('sNueva').addEventListener('click', () => {
   $('fMov').reset(); $('mFecha').value = hoyISO(); $('mMsg').textContent = ''; $('mInfo').textContent = '';
-  opciones($('mDestino'), LISTAS.areas, '', '— Elegir —');
+  // Destino = centro de costo (código), igual que las salidas del Excel y de las solicitudes
+  $('mDestino').innerHTML = '<option value="">— Elegir —</option>' + ((LISTAS.codigosCC || []).length ? LISTAS.codigosCC.map(c => `<option value="${esc(c.codigo)}">${esc(c.codigo + (c.nombre ? ' · ' + c.nombre : ''))}</option>`) : LISTAS.areas.map(a => `<option>${esc(a)}</option>`)).join('');
   $('mTipo').querySelectorAll('option[value^="AJUSTE"]').forEach(o => o.disabled = YO.rol !== 'ADMIN');
   infoMov(); cargarPersonalSilencioso(); $('dMov').showModal();
 });
@@ -1607,7 +1639,7 @@ $('fMov').addEventListener('submit', async e => {
   const p = buscarProd($('mProd').value); if (!p) return $('mMsg').textContent = 'Elige un producto de la lista.';
   const tipoSel = $('mTipo').value, q = r4(num($('mCant').value));
   if (q <= 0) return $('mMsg').textContent = 'La cantidad debe ser mayor a cero.';
-  if (tipoSel === 'SALIDA' && !$('mDestino').value) return $('mMsg').textContent = 'Elige el destino o área.';
+  if (tipoSel === 'SALIDA' && !$('mDestino').value) return $('mMsg').textContent = 'Elige el centro de costo.';
   const b = e.submitter; ocupado(b, true, 'Registrando…'); $('mMsg').textContent = '';
   try {
     await runTransaction(db, async tx => {
