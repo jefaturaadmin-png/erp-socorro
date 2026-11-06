@@ -10,7 +10,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06g'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.06h'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 const MODULOS = [
@@ -266,11 +266,11 @@ function abrirComps(clase) {
       <div class="filtros">
         <label>Mes de emisión<input type="month" data-f="mes" value="${st.mes}"></label>
         <label>Empresa<select data-f="empresa"></select></label>
-        <label>Aprobación<select data-f="aprob"><option value="">Todas</option><option>PENDIENTE</option><option>APROBADO</option><option>RECHAZADO</option><option>ANULADO</option></select></label>
+        <label${serv ? '' : ' hidden'}>Aprobación<select data-f="aprob"><option value="">Todas</option><option>PENDIENTE</option><option>APROBADO</option><option>RECHAZADO</option><option>ANULADO</option></select></label>
         <label class="crece">Buscar<input type="search" data-f="q" placeholder="Proveedor, RUC, serie, número o concepto"></label>
       </div>
       <div class="resumen" data-r="res"></div>
-      <div class="tabla"><table><thead><tr><th>Emisión</th><th>Documento</th><th>Proveedor</th><th>Empresa</th><th>${serv ? 'Tipo de gasto · C. costos' : 'Ítems'}</th><th class="num">Total</th><th>Vence</th><th>Aprobación</th><th></th></tr></thead><tbody data-r="filas"><tr><td colspan="9" class="vacio">Cargando…</td></tr></tbody></table></div>`;
+      <div class="tabla"><table><thead><tr><th>Emisión</th><th>Documento</th><th>Proveedor</th><th>Empresa</th><th>${serv ? 'Tipo de gasto · C. costos' : 'Ítems'}</th><th class="num">Total</th><th>Vence</th>${serv ? '<th>Aprobación</th>' : ''}<th></th></tr></thead><tbody data-r="filas"><tr><td colspan="9" class="vacio">Cargando…</td></tr></tbody></table></div>`;
     sec.addEventListener('click', e => accionComp(clase, e));
     sec.querySelector('[data-f="mes"]').addEventListener('change', e => { st.mes = e.target.value; cargarComps(clase); });
     ['empresa', 'aprob', 'q'].forEach(f => sec.querySelector(`[data-f="${f}"]`).addEventListener('input', () => pintarComps(clase)));
@@ -300,15 +300,16 @@ function pintarComps(clase) {
   const vig = l.filter(c => c.estado !== 'ANULADO');
   const pen = r2(vig.filter(c => c.moneda !== 'USD').reduce((a, c) => a + c.total, 0));
   const usd = r2(vig.filter(c => c.moneda === 'USD').reduce((a, c) => a + c.total, 0));
-  sec.querySelector('[data-r="res"]').innerHTML = `<span><b>${l.length}</b> comprobantes</span><span>Total: <b>S/ ${n2(pen)}</b>${usd ? ` · <b>US$ ${n2(usd)}</b>` : ''}</span><span>Pendientes de aprobación: <b>${vig.filter(c => c.aprobacion?.estado === 'PENDIENTE').length}</b></span>`;
+  sec.querySelector('[data-r="res"]').innerHTML = `<span><b>${l.length}</b> comprobantes</span><span>Total: <b>S/ ${n2(pen)}</b>${usd ? ` · <b>US$ ${n2(usd)}</b>` : ''}</span>${serv ? `<span>Pendientes de aprobación: <b>${vig.filter(c => c.aprobacion?.estado === 'PENDIENTE').length}</b></span>` : ''}`;
   sec.querySelector('[data-r="filas"]').innerHTML = l.length ? l.map(c => {
     const anul = c.estado === 'ANULADO', pendiente = c.aprobacion?.estado === 'PENDIENTE';
     const acc = [`<button class="btn sec chico" data-a="ver" data-id="${esc(c.id)}">Ver</button>`];
-    if (!anul && puede('comprobantes') && (serv ? pendiente : pendiente || c.importado)) acc.push(`<button class="btn sec chico" data-a="editar" data-id="${esc(c.id)}">Editar</button>`);
-    if (!anul && pendiente && puede('aprobar')) acc.push(`<button class="btn chico" data-a="aprobar" data-id="${esc(c.id)}">Aprobar</button><button class="btn peligro chico" data-a="rechazar" data-id="${esc(c.id)}">Rechazar</button>`);
-    if (!anul && puede('comprobantes')) acc.push(`<button class="btn peligro chico" data-a="anular" data-id="${esc(c.id)}">Anular</button>`);
+    // Materiales: solo Ver y Editar (sin aprobación ni anulación)
+    if (!anul && puede('comprobantes') && (serv ? pendiente : true)) acc.push(`<button class="btn sec chico" data-a="editar" data-id="${esc(c.id)}">Editar</button>`);
+    if (serv && !anul && pendiente && puede('aprobar')) acc.push(`<button class="btn chico" data-a="aprobar" data-id="${esc(c.id)}">Aprobar</button><button class="btn peligro chico" data-a="rechazar" data-id="${esc(c.id)}">Rechazar</button>`);
+    if (serv && !anul && puede('comprobantes')) acc.push(`<button class="btn peligro chico" data-a="anular" data-id="${esc(c.id)}">Anular</button>`);
     const det = serv ? `${esc(c.gasto || '')}<br><small class="nota">${esc(c.centro || '')}</small>` : `${(c.lineas || []).length} ítem(s)<br><small class="nota">${esc((c.lineas || []).slice(0, 2).map(x => x.desc).join(', '))}${(c.lineas || []).length > 2 ? '…' : ''}</small>`;
-    return `<tr class="${anul ? 'anulado' : ''}"><td>${fmtF(c.fechaEmision)}</td><td>${esc(c.tipo)}<br><b>${esc(c.serie)}-${esc(c.numero)}</b></td><td>${esc(c.razon)}<br><small class="nota">${esc(c.ruc)}</small></td><td>${esc(c.empresa)}</td><td>${det}</td><td class="num">${mon(c.moneda)} ${n2(c.total)}${c.detMonto ? `<br><small class="nota">Detr. ${n2(c.detMonto)}</small>` : ''}${c.retMonto ? `<br><small class="nota">Ret. ${n2(c.retMonto)}</small>` : ''}</td><td>${fmtF(c.fechaVence)}</td><td>${pill(c)}${c.aprobacion?.usuario ? `<br><small class="nota">${esc(c.aprobacion.usuario)}</small>` : ''}</td><td><div class="acciones">${acc.join('')}</div></td></tr>`;
+    return `<tr class="${anul ? 'anulado' : ''}"><td>${fmtF(c.fechaEmision)}</td><td>${esc(c.tipo)}<br><b>${esc(c.serie)}-${esc(c.numero)}</b></td><td>${esc(c.razon)}<br><small class="nota">${esc(c.ruc)}</small></td><td>${esc(c.empresa)}</td><td>${det}</td><td class="num">${mon(c.moneda)} ${n2(c.total)}${c.detMonto ? `<br><small class="nota">Detr. ${n2(c.detMonto)}</small>` : ''}${c.retMonto ? `<br><small class="nota">Ret. ${n2(c.retMonto)}</small>` : ''}</td><td>${fmtF(c.fechaVence)}</td>${serv ? `<td>${pill(c)}${c.aprobacion?.usuario ? `<br><small class="nota">${esc(c.aprobacion.usuario)}</small>` : ''}</td>` : ''}<td><div class="acciones">${acc.join('')}</div></td></tr>`;
   }).join('') : `<tr><td colspan="9" class="vacio">No hay comprobantes con este filtro.${puede('comprobantes') ? ' Usa “+ Nuevo ingreso” para registrar el primero.' : ''}</td></tr>`;
 }
 async function accionComp(clase, e) {
