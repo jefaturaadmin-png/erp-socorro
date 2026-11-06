@@ -10,8 +10,6 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const limpio = s => String(s ?? '').replace(/\s+/g, ' ').trim();
 const norm = s => limpio(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const fmtF = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '';
-const CLAVE_MIS = 'solicitudes-enviadas';
 
 const db = getFirestore(initializeApp(firebaseConfig));
 let CAT = [], CENTROS = [];
@@ -49,7 +47,6 @@ async function iniciar() {
   $('sFecha').value = hoy();
   limpiarBloques();
   $('carga').hidden = true; $('fSol').hidden = false;
-  pintarMis();
 }
 
 BLOQUES.forEach(b => {
@@ -106,23 +103,12 @@ $('fSol').addEventListener('submit', async e => {
   if (hechos.length) {
     try {
       localStorage.setItem('solicitud-datos', JSON.stringify({ centro, nombre }));
-      const mis = JSON.parse(localStorage.getItem(CLAVE_MIS) || '[]'); mis.unshift(...hechos.map(h => h.id).reverse()); localStorage.setItem(CLAVE_MIS, JSON.stringify(mis.slice(0, 15)));
     } catch (e2) { }
     $('sOk').hidden = false;
     $('sOk').innerHTML = `<b>${hechos.map(h => `Solicitud N.º ${h.numero} (${h.tipo === 'LIMPIEZA' ? 'limpieza' : 'escritorio'})`).join(' y ')} enviada${hechos.length > 1 ? 's' : ''}.</b> Logística ya la${hechos.length > 1 ? 's' : ''} puede ver. Guarda ${hechos.length > 1 ? 'estos números' : 'este número'} para cualquier consulta.`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    pintarMis();
-  }
+    }
   b.disabled = false; b.textContent = 'Enviar solicitud';
 });
-
-async function pintarMis() {
-  let ids = []; try { ids = JSON.parse(localStorage.getItem(CLAVE_MIS) || '[]'); } catch (e) { }
-  if (!ids.length) return;
-  const docs = (await Promise.all(ids.map(id => getDoc(doc(db, 'solicitudes', id)).catch(() => null)))).filter(s => s && s.exists()).map(s => s.data());
-  if (!docs.length) return;
-  $('misBox').hidden = false;
-  $('misFilas').innerHTML = docs.map(s => `<tr><td><b>${s.numero}</b></td><td>${fmtF(s.fecha)}</td><td>${s.tipo === 'LIMPIEZA' ? 'Limpieza' : 'Escritorio'}</td><td>${esc(s.centroNombre || s.centro)}</td><td>${(s.items || []).length}</td><td><span class="pill ${esc(s.estado)}">${esc(s.estado === 'ATENDIDA' ? 'ENTREGADA' : s.estado)}</span>${s.estado === 'ATENDIDA' && s.fechaEntrega ? ` <small class="nota">${fmtF(s.fechaEntrega)}</small>` : ''}${s.estado === 'RECHAZADA' && s.motivo ? `<br><small class="nota">${esc(s.motivo)}</small>` : ''}</td></tr>`).join('');
-}
 
 iniciar();
