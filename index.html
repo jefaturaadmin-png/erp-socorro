@@ -340,6 +340,18 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
           <div class="panel" id="kDet"></div>
         </div>
       </section>
+      <section id="m-solicitudes" class="mod" hidden>
+        <div class="cab"><div><h2>Solicitudes de sucursales</h2><p class="nota">Pedidos de materiales que envía cada sucursal. Al atender una solicitud, la entrega se registra sola como salida en el kardex.</p></div>
+          <div class="acc"><button class="btn sec" type="button" id="solCsv">Exportar Excel</button></div></div>
+        <div class="aviso" id="solLink"></div>
+        <div class="filtros">
+          <label>Estado<select id="solEstado"><option value="PENDIENTE">Pendientes</option><option value="ATENDIDA">Entregadas</option><option value="RECHAZADA">Rechazadas</option><option value="">Todas (del mes)</option></select></label>
+          <label>Mes<input type="month" id="solMes"></label>
+          <label class="crece">Buscar<input type="search" id="solBuscar" placeholder="N.º, sucursal, solicitante o material"></label>
+        </div>
+        <div class="resumen" id="solRes"></div>
+        <div class="tabla"><table><thead><tr><th>N.º</th><th>Fecha</th><th>Sucursal / centro de costo</th><th>Solicitado por</th><th>Materiales</th><th>Estado</th><th></th></tr></thead><tbody id="solFilas"><tr><td colspan="7" class="vacio">Cargando…</td></tr></tbody></table></div>
+      </section>
       <section id="m-salidas" class="mod" hidden>
         <div class="cab"><div><h2>Salida de materiales</h2><p class="nota">Entregas a cada área o centro de costos. Cada salida descuenta el stock del kardex a costo promedio.</p></div>
           <div class="acc"><button class="btn" type="button" id="sNueva">+ Nueva salida</button><button class="btn sec" type="button" id="sCsv">Exportar Excel</button></div></div>
@@ -565,6 +577,25 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
   </form>
 </dialog>
 
+<!-- Diálogo: atender solicitud de sucursal -->
+<dialog id="dSol" class="dlg grande" aria-labelledby="solTit">
+  <form id="fSolAt" novalidate>
+    <div class="dlg-cab"><h2 id="solTit">Solicitud</h2>
+      <div class="acc"><button type="button" class="btn sec" id="solImprimir">Imprimir formato</button><button type="button" class="btn peligro" id="solRechazar">Rechazar</button><button type="submit" class="btn" id="solEntregar">Registrar entrega</button><button type="button" class="btn sec" id="solCerrar">Cerrar</button></div></div>
+    <div class="dlg-cuerpo">
+      <div class="aviso" id="solInfo"></div>
+      <div class="g4" id="solCampos">
+        <label>Fecha de entrega<input id="solFEnt" type="date"></label>
+        <label>Entregado por<input id="solEntPor" maxlength="80"></label>
+        <label class="s2">Recibido por<input id="solRecPor" maxlength="80" list="dlPersonal"></label>
+      </div>
+      <div class="tabla" style="margin-top:10px"><table><thead><tr><th>#</th><th>Lo que pidió la sucursal</th><th class="num">Pidió</th><th>Material del kardex</th><th class="num">Stock</th><th class="num">Entregar</th><th class="num">Costo unit.</th><th class="num">Costo total</th></tr></thead><tbody id="solItems"></tbody><tfoot><tr><td colspan="7" class="num"><b>Total</b></td><td class="num"><b id="solTotal">0.00</b></td></tr></tfoot></table></div>
+      <p class="nota">Si no hay un material, deja “Entregar” en 0: esa línea queda como no entregada. Si lo que pidió no está en el kardex, elige el material equivalente de la lista.</p>
+      <div class="msg" id="solMsg" style="text-align:left"></div>
+    </div>
+  </form>
+</dialog>
+
 <!-- Diálogo: trabajador -->
 <dialog id="dPer" class="dlg medio" aria-labelledby="pTit">
   <form id="fPer">
@@ -614,6 +645,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.06h"></script>
+<script type="module" src="app.js?v=2026.11.06i"></script>
 </body>
 </html>
