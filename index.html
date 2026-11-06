@@ -116,6 +116,8 @@ dialog::backdrop{background:rgba(30,25,20,.45)}
 .dlg.grande .dlg-cuerpo{overflow:auto;flex:1}
 .dlg.medio{width:620px}
 .comp{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:16px;align-items:start}
+.comp.sin-img{grid-template-columns:1fr}
+.comp-img[hidden]{display:none}
 .comp-img{position:sticky;top:0;display:flex;flex-direction:column;gap:8px}
 .drop{border:2px dashed #e0b48a;border-radius:8px;background:var(--suave2);min-height:300px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--gris);cursor:pointer;padding:10px;overflow:hidden}
 .drop.arrastre{background:var(--suave);border-color:var(--marca)}
@@ -611,6 +613,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.06e"></script>
+<script type="module" src="app.js?v=2026.11.06f"></script>
 </body>
 </html>
