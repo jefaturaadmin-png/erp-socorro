@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.06p'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.14a'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -1390,6 +1390,7 @@ function abrirSolicitudes() {
   $('solLink').innerHTML = `<b>Enlace para las sucursales</b> (no necesita usuario ni contraseña): <a href="${esc(urlSolicitud())}" target="_blank" rel="noopener">${esc(urlSolicitud())}</a> <button type="button" class="btn sec chico" id="solCopiar">Copiar enlace</button>`;
   $('solCopiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText(urlSolicitud()); toast('Enlace copiado. Envíalo a las sucursales.'); } catch (e) { prompt('Copia este enlace:', urlSolicitud()); } });
   sincronizarCatalogo();
+  opcionesSucursal();
   cargarSolicitudes();
 }
 async function cargarSolicitudes() {
@@ -1415,7 +1416,7 @@ function pintarSolicitudes() {
   $('solFilas').innerHTML = l.length ? l.map(x => `<tr><td><b>${x.numero}</b></td><td>${fmtF(x.fecha)}</td><td><span class="pill ${x.tipo === 'LIMPIEZA' ? 'AJUSTE' : 'ENTRADA'}">${tipoSolTxt(x)}</span></td><td>${esc(x.centroNombre || x.centro)}</td><td>${esc(x.solicitante)}</td>
       <td>${(x.items || []).length} material(es)<br><small class="nota">${esc((x.items || []).slice(0, 3).map(i => `${i.desc} (${nq(i.cant)})`).join(', '))}${(x.items || []).length > 3 ? '…' : ''}</small>${x.nota ? `<br><small class="nota">“${esc(x.nota)}”</small>` : ''}</td>
       <td><span class="pill ${x.estado === 'ATENDIDA' ? 'APROBADO' : x.estado === 'RECHAZADA' ? 'RECHAZADO' : 'PENDIENTE'}">${esc(estSol(x.estado))}</span>${x.fechaEntrega ? `<br><small class="nota">${fmtF(x.fechaEntrega)}</small>` : ''}</td>
-      <td><div class="acciones">${x.estado === 'PENDIENTE' && op ? `<button class="btn chico" data-sol="${esc(x.id)}">Atender</button>` : `<button class="btn sec chico" data-sol="${esc(x.id)}">Ver</button>`}<button class="btn sec chico" data-solimp="${esc(x.id)}">Imprimir</button></div></td></tr>`).join('')
+      <td><div class="acciones">${x.estado === 'PENDIENTE' && op ? `<button class="btn chico" data-sol="${esc(x.id)}">Atender</button>` : `<button class="btn sec chico" data-sol="${esc(x.id)}">Ver</button>`}<button class="btn sec chico" data-solxls="${esc(x.id)}" title="Descargar esta solicitud en Excel">Excel</button>${YO.rol === 'ADMIN' ? `<button class="btn peligro chico" data-soldel="${esc(x.id)}" title="Borrar esta solicitud">Borrar</button>` : ''}</div></td></tr>`).join('')
     : '<tr><td colspan="8" class="vacio">No hay solicitudes con este filtro.</td></tr>';
 }
 $('solEstado').addEventListener('change', () => { if ($('solEstado').value === 'PENDIENTE') $('solMes').value = ''; cargarSolicitudes(); });
@@ -1428,10 +1429,85 @@ $('solCsv').addEventListener('click', () => {
   filtrarSolicitudes().forEach(x => (x.entrega || x.items || []).forEach(i => f.push([x.numero, tipoSolTxt(x), fmtF(x.fecha), x.centroNombre || x.centro, x.solicitante, estSol(x.estado), fmtF(x.fechaEntrega), i.desc, String(i.cantSol ?? i.cant).replace('.', ','), i.codigo || '', i.producto || '', x.entrega ? String(i.cant).replace('.', ',') : '', x.entrega ? numCSV(i.cu) : '', x.entrega ? numCSV(i.ct) : '', x.recibidoPor || '', x.entregadoPor || ''])));
   descargarCSV(`solicitudes_${$('solMes').value || 'pendientes'}.csv`, f);
 });
-$('solFilas').addEventListener('click', e => {
-  const a = e.target.closest('[data-sol]'), im = e.target.closest('[data-solimp]');
+$('solFilas').addEventListener('click', async e => {
+  const a = e.target.closest('[data-sol]'), xl = e.target.closest('[data-solxls]'), del = e.target.closest('[data-soldel]');
   if (a) abrirSolicitud(SOLS.lista.find(x => x.id === a.dataset.sol));
-  if (im) imprimirSolicitud(SOLS.lista.find(x => x.id === im.dataset.solimp));
+  if (xl) { const x = SOLS.lista.find(y => y.id === xl.dataset.solxls); if (x) excelSolicitud(x, xl); }
+  if (del) {
+    const x = SOLS.lista.find(y => y.id === del.dataset.soldel); if (!x) return;
+    const extra = x.estado === 'ATENDIDA' ? '\n\nYa fue entregada: las salidas que registró en el kardex NO se borran (si hace falta, elimínalas en Salida de materiales).' : '';
+    if (!confirm(`¿Borrar la solicitud N.º ${x.numero} (${tipoSolTxt(x).toLowerCase()}) de ${x.centroNombre || x.centro}?${extra}\n\nNo se puede deshacer.`)) return;
+    ocupado(del, true);
+    try { await deleteDoc(doc(db, 'solicitudes', x.id)); toast(`Solicitud N.º ${x.numero} borrada.`); SOLS.lista = SOLS.lista.filter(y => y.id !== x.id); pintarSolicitudes(); }
+    catch (err) { toast(errorTexto(err), true); ocupado(del, false); }
+  }
+});
+
+/* Excel (.xlsx) de solicitudes */
+async function libroXlsx() { await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); return window.XLSX; }
+function hojaXlsx(X, filas, anchos) { const ws = X.utils.aoa_to_sheet(filas); ws['!cols'] = anchos.map(w => ({ wch: w })); return ws; }
+const sucTxt = x => x.centroNombre || x.centro;
+// Una solicitud: datos de cabecera y sus materiales
+async function excelSolicitud(x, b) {
+  ocupado(b, true, '…');
+  try {
+    const X = await libroXlsx(), entregada = !!x.entrega;
+    const filas = [[`FORMATO DE CONSUMO DE MATERIALES DE ${tipoSolTxt(x)}`], [],
+      ['N.º correlativo', x.numero], ['Fecha de solicitud', fmtF(x.fecha)], ['Sucursal / centro de costo', sucTxt(x)], ['Solicitado por', x.solicitante], ['Estado', estSol(x.estado)],
+      ...(entregada ? [['Fecha de entrega', fmtF(x.fechaEntrega)], ['Entregado por', x.entregadoPor || ''], ['Recibido por', x.recibidoPor || '']] : []),
+      ...(x.nota ? [['Comentario', x.nota]] : []), [],
+      entregada ? ['#', 'Material pedido', 'Cant. pedida', 'Código', 'Material entregado', 'Cant. entregada', 'Unidad', 'Costo unit.', 'Costo total'] : ['#', 'Material', 'Cantidad', 'Unidad', 'Código', 'Stock actual']];
+    (x.entrega || x.items || []).forEach((i, k) => filas.push(entregada
+      ? [k + 1, i.desc, i.cantSol ?? '', i.codigo || '', i.producto || '', i.cant, i.unidad || '', r2(i.cu || 0), r2(i.ct || 0)]
+      : [k + 1, i.desc, i.cant, i.unidad || '', i.codigo || '', i.prodId && PRODUCTOS.get(i.prodId) ? PRODUCTOS.get(i.prodId).stock : '']));
+    if (entregada) filas.push([], ['', '', '', '', '', '', '', 'TOTAL S/', r2(x.totalCosto || 0)]);
+    const wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, hojaXlsx(X, filas, [24, 34, 12, 10, 32, 14, 10, 12, 12]), `Solicitud ${x.numero}`);
+    X.writeFile(wb, `solicitud_${x.numero}_${tipoSolTxt(x).toLowerCase()}_${String(x.centro).replace(/\W+/g, '')}.xlsx`);
+  } catch (err) { toast(errorTexto(err), true); }
+  ocupado(b, false);
+}
+// Todas las pendientes de un tipo: resumen por material (para comprar o preparar) y detalle por sucursal
+async function excelPendientes(tipo, b) {
+  ocupado(b, true, 'Preparando…');
+  try {
+    const X = await libroXlsx();
+    const s = await getDocs(query(collection(db, 'solicitudes'), where('estado', '==', 'PENDIENTE')));
+    const l = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => (x.tipo || 'ESCRITORIO') === tipo)
+      .sort((a, c) => String(a.centro).localeCompare(String(c.centro), 'es', { numeric: true }) || a.numero - c.numero);
+    if (!l.length) { toast(`No hay solicitudes pendientes de ${tipo === 'LIMPIEZA' ? 'limpieza' : 'escritorio'}.`); ocupado(b, false); return; }
+    const res = new Map();
+    l.forEach(x => (x.items || []).forEach(i => {
+      const p = i.prodId ? PRODUCTOS.get(i.prodId) : buscarProd(i.desc), k = p ? 'p:' + p.id : 'd:' + norm(i.desc) + '|' + norm(i.unidad);
+      const r = res.get(k) || { codigo: p?.codigo || '', desc: (p?.nombre || i.desc).toUpperCase(), unidad: p?.unidad || i.unidad || '', total: 0, sucs: new Set(), stock: p ? p.stock : null };
+      r.total = r4(r.total + (Number(i.cant) || 0)); r.sucs.add(sucTxt(x)); res.set(k, r);
+    }));
+    const resumen = [[`PENDIENTES DE ${tipo} · ${l.length} solicitudes · al ${fmtF(hoyISO())}`], [], ['Código', 'Material', 'Unidad', 'Total pedido', 'Stock actual', 'Falta comprar', 'Sucursales que lo piden']];
+    [...res.values()].sort((a, c) => a.desc.localeCompare(c.desc, 'es')).forEach(r => resumen.push([r.codigo, r.desc, r.unidad, r.total, r.stock ?? 'no está en kardex', r.stock === null ? r.total : Math.max(0, r4(r.total - r.stock)), [...r.sucs].join(', ')]));
+    const det = [['N.º', 'Fecha', 'Sucursal / centro de costo', 'Solicitado por', 'Material', 'Cantidad', 'Unidad', 'Código', 'Comentario']];
+    l.forEach(x => (x.items || []).forEach(i => det.push([x.numero, fmtF(x.fecha), sucTxt(x), x.solicitante, i.desc, i.cant, i.unidad || '', i.codigo || '', x.nota || ''])));
+    const wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, hojaXlsx(X, resumen, [10, 38, 10, 13, 13, 14, 60]), 'Resumen por material');
+    X.utils.book_append_sheet(wb, hojaXlsx(X, det, [7, 12, 34, 28, 38, 10, 10, 10, 40]), 'Detalle por sucursal');
+    X.writeFile(wb, `pendientes_${tipo.toLowerCase()}_${hoyISO()}.xlsx`);
+  } catch (err) { toast(errorTexto(err), true); }
+  ocupado(b, false);
+}
+$('solXlsE').addEventListener('click', e => excelPendientes('ESCRITORIO', e.currentTarget));
+$('solXlsL').addEventListener('click', e => excelPendientes('LIMPIEZA', e.currentTarget));
+
+// Imprimir por sucursal: escritorio y limpieza juntos, cada solicitud en su propia hoja
+function opcionesSucursal() {
+  const ant = $('solSuc').value;
+  $('solSuc').innerHTML = '<option value="">— Elegir sucursal —</option>' + (LISTAS.codigosCC || []).map(c => `<option value="${esc(c.codigo)}">${esc(c.codigo + (c.nombre ? ' · ' + c.nombre : ''))}</option>`).join('');
+  if (ant) $('solSuc').value = ant;
+}
+$('solImpSuc').addEventListener('click', () => {
+  const c = $('solSuc').value; if (!c) return toast('Elige la sucursal que quieres imprimir.', true);
+  const l = SOLS.lista.filter(x => String(x.centro) === c).sort((a, b) => (tipoSolTxt(a) === 'ESCRITORIO' ? 0 : 1) - (tipoSolTxt(b) === 'ESCRITORIO' ? 0 : 1) || a.numero - b.numero);
+  const nom = $('solSuc').selectedOptions[0].textContent, est = $('solEstado').selectedOptions[0].textContent.toLowerCase();
+  if (!l.length) return toast(`${nom} no tiene solicitudes en “${est}”.`, true);
+  abrirImpresion(`Sucursal ${nom}`, l.map(x => htmlFormato(x)));
 });
 
 // Atender: cada línea se enlaza con un material del kardex y se registra la salida
@@ -1521,25 +1597,12 @@ $('fSolAt').addEventListener('submit', async e => {
 });
 
 // Formato impreso como el de papel: "Formato de consumo de materiales de escritorio"
-function imprimirSolicitud(x, borrador) {
-  if (!x) return;
+function htmlFormato(x, borrador) {
   const filas = borrador ? borrador.lineas.map(l => { const p = l.prodId ? PRODUCTOS.get(l.prodId) : null, cu = p?.cProm || 0; return { codigo: p?.codigo || '', cant: l.entregar, unidad: p?.unidad || l.unidadSol, desc: p?.nombre || l.desc, cu, ct: r2(cu * l.entregar) }; })
     : x.entrega ? x.entrega.map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.producto || i.desc, cu: i.cu, ct: i.ct, pedido: i.desc, cantSol: i.cantSol }))
       : (x.items || []).map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.desc, cu: null, ct: null }));
   const tot = filas.reduce((a, f) => a + (f.ct || 0), 0);
-  const w = window.open('', '_blank'); if (!w) return toast('El navegador bloqueó la ventana. Permite las ventanas emergentes para imprimir.', true);
-  w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Solicitud N.º ${x.numero}</title><style>
-    body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:28px;font-size:13px}
-    .cab{display:flex;justify-content:space-between;align-items:center}.cab img{width:70px}
-    h1{font-size:17px;text-decoration:underline;margin:0}
-    .datos{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:18px 0}
-    .datos div{display:flex;gap:8px;align-items:center}.datos b{border:1.5px solid #222;padding:4px 10px;min-width:120px;display:inline-block}
-    table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1.5px solid #222;padding:6px 8px}th{background:#e8e8e8}
-    td.n{text-align:right}tfoot td{font-weight:bold}
-    .firmas{display:flex;justify-content:space-between;margin-top:60px}.firmas div{width:40%;text-align:center;border-top:1.5px solid #222;padding-top:6px}
-    .nota{color:#666;font-size:11px}
-    @media print{body{margin:10mm}}
-  </style></head><body>
+  return `<section class="hoja">
     <div class="cab"><h1>FORMATO DE CONSUMO DE MATERIALES DE ${tipoSolTxt(x)}</h1><img src="${esc(new URL('logo.png', location.href).href)}" alt=""></div>
     <div class="datos">
       <div>Fecha de solicitud <b>${fmtF(x.fecha)}</b></div><div>N.º correlativo <b>${x.numero}</b></div>
@@ -1551,9 +1614,27 @@ function imprimirSolicitud(x, borrador) {
     </tbody>${x.entrega || borrador ? `<tfoot><tr><td colspan="4" class="n">TOTAL S/</td><td class="n">${n2(tot)}</td></tr></tfoot>` : ''}</table>
     <p class="nota">Solicitado por: ${esc(x.solicitante)}${x.nota ? ' · ' + esc(x.nota) : ''}</p>
     <div class="firmas"><div>Entregado por: ${esc(borrador ? limpio($('solEntPor').value) : x.entregadoPor || '')}</div><div>Recibido por: ${esc(borrador ? limpio($('solRecPor').value) : x.recibidoPor || '')}</div></div>
+  </section>`;
+}
+function abrirImpresion(titulo, hojas) {
+  const w = window.open('', '_blank'); if (!w) return toast('El navegador bloqueó la ventana. Permite las ventanas emergentes para imprimir.', true);
+  w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>
+    body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:28px;font-size:13px}
+    .hoja+.hoja{page-break-before:always;break-before:page;margin-top:40px}
+    .cab{display:flex;justify-content:space-between;align-items:center}.cab img{width:70px}
+    h1{font-size:17px;text-decoration:underline;margin:0}
+    .datos{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:18px 0}
+    .datos div{display:flex;gap:8px;align-items:center}.datos b{border:1.5px solid #222;padding:4px 10px;min-width:120px;display:inline-block}
+    table{width:100%;border-collapse:collapse;margin-top:6px}th,td{border:1.5px solid #222;padding:6px 8px}th{background:#e8e8e8}
+    td.n{text-align:right}tfoot td{font-weight:bold}
+    .firmas{display:flex;justify-content:space-between;margin-top:60px}.firmas div{width:40%;text-align:center;border-top:1.5px solid #222;padding-top:6px}
+    .nota{color:#666;font-size:11px}
+    @media print{body{margin:10mm}.hoja+.hoja{margin-top:0}}
+  </style></head><body>${hojas.join('')}
     <script>window.onload=()=>window.print()<\/script></body></html>`);
   w.document.close();
 }
+function imprimirSolicitud(x, borrador) { if (x) abrirImpresion(`Solicitud N.º ${x.numero}`, [htmlFormato(x, borrador)]); }
 
 /* ================= Salida de materiales (módulo aparte; el kardex solo se consulta) ================= */
 const SAL = { lista: [] };
