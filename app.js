@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.14a'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.18a'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -1507,7 +1507,7 @@ $('solImpSuc').addEventListener('click', () => {
   const l = SOLS.lista.filter(x => String(x.centro) === c).sort((a, b) => (tipoSolTxt(a) === 'ESCRITORIO' ? 0 : 1) - (tipoSolTxt(b) === 'ESCRITORIO' ? 0 : 1) || a.numero - b.numero);
   const nom = $('solSuc').selectedOptions[0].textContent, est = $('solEstado').selectedOptions[0].textContent.toLowerCase();
   if (!l.length) return toast(`${nom} no tiene solicitudes en “${est}”.`, true);
-  abrirImpresion(`Sucursal ${nom}`, l.map(x => htmlFormato(x)));
+  imprimirSucursalUnaHoja(nom, l); // una sola hoja: escritorio arriba y limpieza abajo
 });
 
 // Atender: cada línea se enlaza con un material del kardex y se registra la salida
@@ -1632,6 +1632,67 @@ function abrirImpresion(titulo, hojas) {
     @media print{body{margin:10mm}.hoja+.hoja{margin-top:0}}
   </style></head><body>${hojas.join('')}
     <script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+// Imprimir por sucursal en UNA sola hoja A4: útiles de escritorio en la mitad de arriba y limpieza en la de abajo.
+// Si hay muchos materiales, la letra se achica sola y, si hace falta, la tabla pasa a dos columnas para que siempre entre.
+function filasImpresion(x) {
+  return x.entrega ? x.entrega.filter(i => i.cant > 0).map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.producto || i.desc, cu: i.cu, ct: i.ct }))
+    : (x.items || []).map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.desc, cu: null, ct: null }));
+}
+function htmlMedia(tipo, l, nombreSuc) {
+  const tit = `FORMATO DE CONSUMO DE MATERIALES DE ${tipo}`;
+  if (!l.length) return `<section class="media vacia"><div class="cab"><h1>${tit}</h1></div><p class="sin">${esc(nombreSuc)} no tiene solicitudes de ${tipo === 'LIMPIEZA' ? 'materiales de limpieza' : 'útiles de escritorio'} en este estado.</p></section>`;
+  const unicos = v => [...new Set(v.filter(Boolean))];
+  const filas = l.flatMap(filasImpresion), conCosto = l.some(x => x.entrega), tot = filas.reduce((a, f) => a + (f.ct || 0), 0);
+  const tabla = fs => `<table><thead><tr><th>Código</th><th>Cantidad</th><th>Descripción</th>${conCosto ? '<th>C. unit.</th><th>C. total</th>' : ''}</tr></thead><tbody>${fs.map(f => `<tr><td>${esc(f.codigo || '')}</td><td class="nw">${nq(f.cant)} ${esc(f.unidad || '')}</td><td>${esc(f.desc)}</td>${conCosto ? `<td class="n">${f.cu === null ? '' : n2(f.cu)}</td><td class="n">${f.ct === null ? '' : n2(f.ct)}</td>` : ''}</tr>`).join('')}</tbody></table>`;
+  const mitad = Math.ceil(filas.length / 2);
+  return `<section class="media">
+    <div class="cab"><h1>${tit}</h1><img src="${esc(new URL('logo.png', location.href).href)}" alt=""></div>
+    <div class="datos">
+      <div>Fecha de solicitud <b>${unicos(l.map(x => fmtF(x.fecha))).join(', ')}</b></div><div>N.º correlativo <b>${l.map(x => x.numero).join(', ')}</b></div>
+      <div>Fecha de entrega <b>${unicos(l.map(x => fmtF(x.fechaEntrega))).join(', ') || '&nbsp;'}</b></div><div>Centro de costo <b>${esc(nombreSuc)}</b></div>
+    </div>
+    <div class="una">${tabla(filas)}</div>
+    <div class="dos" hidden><div>${tabla(filas.slice(0, mitad))}</div><div>${tabla(filas.slice(mitad))}</div></div>
+    ${conCosto ? `<p class="tot">TOTAL S/ ${n2(tot)}</p>` : ''}
+    <p class="nota">Solicitado por: ${esc(unicos(l.map(x => x.solicitante)).join(', '))}${unicos(l.map(x => x.nota)).length ? ' · ' + esc(unicos(l.map(x => x.nota)).join(' · ')) : ''}</p>
+    <div class="firmas"><div>Entregado por: ${esc(unicos(l.map(x => x.entregadoPor)).join(', '))}</div><div>Recibido por: ${esc(unicos(l.map(x => x.recibidoPor)).join(', '))}</div></div>
+  </section>`;
+}
+function imprimirSucursalUnaHoja(nombreSuc, l) {
+  const de = t => l.filter(x => tipoSolTxt(x) === t).sort((a, b) => a.numero - b.numero);
+  const w = window.open('', '_blank'); if (!w) return toast('El navegador bloqueó la ventana. Permite las ventanas emergentes para imprimir.', true);
+  w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Sucursal ${esc(nombreSuc)}</title><style>
+    @page{size:A4 portrait;margin:8mm}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{font-family:Arial,Helvetica,sans-serif;color:#222;width:194mm;margin:0 auto}
+    .hoja{height:279mm;display:flex;flex-direction:column}
+    .media{height:139mm;overflow:hidden;padding:2mm 1mm;display:flex;flex-direction:column;gap:1.6mm;font-size:11px}
+    .media+.media{border-top:1.5px dashed #888;padding-top:3mm}
+    .cab{display:flex;justify-content:space-between;align-items:center}.cab img{height:9mm}
+    h1{font-size:1.3em;text-decoration:underline;margin:0}
+    .datos{display:grid;grid-template-columns:1fr 1fr;gap:1mm 6mm}
+    .datos div{display:flex;gap:2mm;align-items:center}.datos b{border:1.2px solid #222;padding:.5mm 2mm;flex:1}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #222;padding:.35em .6em;vertical-align:top}th{background:#e8e8e8}
+    td.n{text-align:right}td.nw{white-space:nowrap}
+    .dos{display:grid;grid-template-columns:1fr 1fr;gap:2mm}.dos[hidden],.una[hidden]{display:none}
+    .tot{margin:0;text-align:right;font-weight:bold}
+    .nota{color:#555;font-size:.85em;margin:0}
+    .firmas{display:flex;justify-content:space-between;margin-top:auto;padding-top:7mm}.firmas div{width:42%;text-align:center;border-top:1.2px solid #222;padding-top:1mm;font-size:.9em}
+    .sin{color:#777;font-style:italic;margin:6mm 0}
+  </style></head><body><div class="hoja">${htmlMedia('ESCRITORIO', de('ESCRITORIO'), nombreSuc)}${htmlMedia('LIMPIEZA', de('LIMPIEZA'), nombreSuc)}</div>
+    <script>
+      // achica la letra de cada mitad hasta que entre; si no alcanza, pasa la tabla a dos columnas
+      function cabe(m) { return m.scrollHeight <= m.clientHeight + 1; }
+      document.querySelectorAll('.media:not(.vacia)').forEach(function (m) {
+        var t = 11; m.style.fontSize = t + 'px';
+        while (!cabe(m) && t > 7.5) { t -= 0.5; m.style.fontSize = t + 'px'; }
+        if (!cabe(m)) { m.querySelector('.una').hidden = true; m.querySelector('.dos').hidden = false; t = 10; m.style.fontSize = t + 'px'; while (!cabe(m) && t > 4.5) { t -= 0.5; m.style.fontSize = t + 'px'; } }
+      });
+      window.onload = function () { window.print(); };
+    <\/script></body></html>`);
   w.document.close();
 }
 function imprimirSolicitud(x, borrador) { if (x) abrirImpresion(`Solicitud N.º ${x.numero}`, [htmlFormato(x, borrador)]); }
