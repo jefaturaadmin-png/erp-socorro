@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.18e'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.18f'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -1519,17 +1519,28 @@ $('solXlsE').addEventListener('click', e => excelPendientes('ESCRITORIO', e.curr
 $('solXlsL').addEventListener('click', e => excelPendientes('LIMPIEZA', e.currentTarget));
 
 
-// Atender: cada línea se enlaza con un material del kardex y se registra la salida
+// Atender: cada línea se enlaza con un material del kardex y se registra la salida.
+// Si la sucursal pidió escritorio y limpieza en el mismo envío, se atienden juntos en la misma ventana.
 let SOL = null;
+const lineasDe = x => (x.entrega || x.items || []).map(i => {
+  const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.producto || i.desc);
+  return { desc: i.desc, cantSol: i.cantSol ?? i.cant, unidadSol: i.unidad || '', prodId: p?.id || null, entregar: x.entrega ? i.cant : (i.cant || 0), cu: i.cu, obs: i.obs || '' };
+});
+// La otra mitad del mismo pedido: misma sucursal, fecha y solicitante, el otro tipo y número correlativo seguido
+const parejaDe = x => SOLS.lista.find(y => y.id !== x.id && y.estado === x.estado && String(y.centro) === String(x.centro) && y.fecha === x.fecha
+  && y.solicitante === x.solicitante && tipoSolTxt(y) !== tipoSolTxt(x) && Math.abs((y.numero || 0) - (x.numero || 0)) === 1);
+const nums = l => l.map(p => p.x.numero).join(' y ');
 function abrirSolicitud(x) {
   if (!x) return;
   const editable = x.estado === 'PENDIENTE' && puede('kardex');
-  SOL = { x, editable, lineas: (x.entrega || x.items || []).map(i => {
-    const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.producto || i.desc);
-    return { desc: i.desc, cantSol: i.cantSol ?? i.cant, unidadSol: i.unidad || '', prodId: p?.id || null, entregar: x.entrega ? i.cant : (i.cant || 0), cu: i.cu, obs: i.obs || '' };
-  }) };
-  $('solTit').textContent = `Solicitud N.º ${x.numero} · ${tipoSolTxt(x) === 'LIMPIEZA' ? 'Limpieza' : 'Escritorio'} · ${x.centroNombre || x.centro}`;
-  $('solInfo').innerHTML = `Solicitado por <b>${esc(x.solicitante)}</b> el ${fmtF(x.fecha)} · Estado: <b>${esc(estSol(x.estado))}</b>${x.nota ? ` · Comentario: “${esc(x.nota)}”` : ''}${x.motivo ? ` · Motivo: ${esc(x.motivo)}` : ''}${x.atendidoPor ? ` · Registró: ${esc(x.atendidoPor)}` : ''}`;
+  const xs = [x, parejaDe(x)].filter(Boolean).sort((a, b) => (tipoSolTxt(a) === 'ESCRITORIO' ? 0 : 1) - (tipoSolTxt(b) === 'ESCRITORIO' ? 0 : 1));
+  SOL = { editable, partes: xs.map(y => ({ x: y, lineas: lineasDe(y) })) };
+  SOL.x = SOL.partes[0].x; // compatibilidad
+  const dos = SOL.partes.length > 1;
+  $('solTit').textContent = `${dos ? 'Solicitudes' : 'Solicitud'} N.º ${nums(SOL.partes)} · ${dos ? 'Escritorio y limpieza' : tipoSolTxt(x) === 'LIMPIEZA' ? 'Limpieza' : 'Escritorio'} · ${x.centroNombre || x.centro}`;
+  $('solInfo').innerHTML = `Solicitado por <b>${esc(x.solicitante)}</b> el ${fmtF(x.fecha)} · Estado: <b>${esc(estSol(x.estado))}</b>${dos ? ' · <b>Escritorio y limpieza del mismo pedido: se atienden juntos</b>' : ''}`
+    + SOL.partes.map(p => (p.x.nota ? ` · Comentario: “${esc(p.x.nota)}”` : '') + (p.x.motivo ? ` · Motivo${dos ? ' N.º ' + p.x.numero : ''}: ${esc(p.x.motivo)}` : '')).filter((t, i, a) => a.indexOf(t) === i).join('')
+    + (x.atendidoPor ? ` · Registró: ${esc(x.atendidoPor)}` : '');
   $('solFEnt').value = x.fechaEntrega || hoyISO(); $('solEntPor').value = x.entregadoPor || YO.nombre; $('solRecPor').value = x.recibidoPor || x.solicitante || '';
   ['solFEnt', 'solEntPor', 'solRecPor'].forEach(id => { $(id).disabled = !editable; });
   $('solEntregar').hidden = $('solRechazar').hidden = !editable;
@@ -1540,23 +1551,35 @@ function abrirSolicitud(x) {
 }
 function pintarLineasSol() {
   const dis = SOL.editable ? '' : ' disabled'; let tot = 0;
-  $('solItems').innerHTML = SOL.lineas.map((l, i) => {
-    const p = l.prodId ? PRODUCTOS.get(l.prodId) : null, cu = SOL.editable ? (p?.cProm || 0) : (l.cu || 0), ct = r2(cu * (Number(l.entregar) || 0)); tot += ct;
-    const falta = SOL.editable && p && Number(l.entregar) > p.stock + 1e-9;
-    const no = !(Number(l.entregar) > 0), parcial = !no && Number(l.entregar) < Number(l.cantSol);
-    return `<tr data-i="${i}" class="${no ? 'sol-no' : parcial ? 'sol-parcial' : ''}"><td class="c">${i + 1}</td><td>${esc(l.desc)}</td><td class="num">${nq(l.cantSol)} <small class="nota">${esc(l.unidadSol)}</small></td>
-      <td><input data-f="prod" list="dlProd" value="${p ? esc(etiquetaProd(p)) : ''}" placeholder="Elegir material del kardex"${dis} aria-label="Material del kardex para la línea ${i + 1}" style="min-width:240px"></td>
-      <td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td>
-      <td class="num"><input class="w6 num" type="number" min="0" step="any" data-f="cant" value="${l.entregar}"${dis} aria-label="Cantidad a entregar en la línea ${i + 1}"></td>
-      <td>${SOL.editable ? `<input data-f="obs" list="dlObs" maxlength="120" value="${esc(l.obs || '')}" class="${no && !limpio(l.obs) ? 'obs-req' : ''}" placeholder="${no ? '¿Por qué no se entrega?' : parcial ? '¿Por qué se entrega menos?' : 'Opcional'}" aria-label="Observación de la línea ${i + 1}" style="min-width:190px">`
-        : (l.obs ? `<span class="obs-txt">${esc(l.obs)}</span>` : (no ? '<span class="obs-txt">No atendido</span>' : ''))}</td>
-      <td class="num">${n2(cu)}</td><td class="num">${n2(ct)}</td></tr>`;
+  const dos = SOL.partes.length > 1;
+  $('solItems').innerHTML = SOL.partes.map((parte, pi) => {
+    let sub = 0;
+    const filas = parte.lineas.map((l, i) => {
+      const p = l.prodId ? PRODUCTOS.get(l.prodId) : null, cu = SOL.editable ? (p?.cProm || 0) : (l.cu || 0), ct = r2(cu * (Number(l.entregar) || 0)); sub += ct;
+      // stock que queda contando lo que ya se entrega del mismo material en otras líneas
+      const usado = SOL.partes.flatMap(q => q.lineas).filter(o => o !== l && o.prodId && o.prodId === l.prodId).reduce((a, o) => a + (Number(o.entregar) || 0), 0);
+      const falta = SOL.editable && p && Number(l.entregar) + usado > p.stock + 1e-9;
+      const no = !(Number(l.entregar) > 0), parcial = !no && Number(l.entregar) < Number(l.cantSol);
+      const id = `${pi}-${i}`;
+      return `<tr data-i="${id}" class="${no ? 'sol-no' : parcial ? 'sol-parcial' : ''}"><td class="c">${i + 1}</td><td>${esc(l.desc)}</td><td class="num">${nq(l.cantSol)} <small class="nota">${esc(l.unidadSol)}</small></td>
+        <td><input data-f="prod" list="dlProd" value="${p ? esc(etiquetaProd(p)) : ''}" placeholder="Elegir material del kardex"${dis} aria-label="Material del kardex para la línea ${i + 1}" style="min-width:240px"></td>
+        <td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold" title="No alcanza el stock"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td>
+        <td class="num"><input class="w6 num" type="number" min="0" step="any" data-f="cant" value="${l.entregar}"${dis} aria-label="Cantidad a entregar en la línea ${i + 1}"></td>
+        <td>${SOL.editable ? `<input data-f="obs" list="dlObs" maxlength="120" value="${esc(l.obs || '')}" class="${no && !limpio(l.obs) ? 'obs-req' : ''}" placeholder="${no ? '¿Por qué no se entrega?' : parcial ? '¿Por qué se entrega menos?' : 'Opcional'}" aria-label="Observación de la línea ${i + 1}" style="min-width:190px">`
+          : (l.obs ? `<span class="obs-txt">${esc(l.obs)}</span>` : (no ? '<span class="obs-txt">No atendido</span>' : ''))}</td>
+        <td class="num">${n2(cu)}</td><td class="num">${n2(ct)}</td></tr>`;
+    }).join('');
+    tot += sub;
+    const lim = tipoSolTxt(parte.x) === 'LIMPIEZA';
+    const cab = dos ? `<tr class="sol-sec ${lim ? 'lim' : 'esc'}"><td colspan="8">${lim ? '🧽 Materiales de limpieza' : '✏️ Útiles de escritorio'} · Solicitud N.º ${parte.x.numero}</td><td class="num">${n2(sub)}</td></tr>` : '';
+    return cab + filas;
   }).join('');
   $('solTotal').textContent = n2(tot);
 }
+const lineaSol = tr => { const [pi, i] = tr.dataset.i.split('-').map(Number); return SOL.partes[pi].lineas[i]; };
 $('solItems').addEventListener('change', e => {
   const tr = e.target.closest('tr[data-i]'); if (!tr || !SOL?.editable) return;
-  const l = SOL.lineas[+tr.dataset.i];
+  const l = lineaSol(tr);
   if (e.target.dataset.f === 'prod') { const p = buscarProd(e.target.value); l.prodId = p?.id || null; if (e.target.value && !p) toast('Elige un material de la lista del kardex.', true); }
   if (e.target.dataset.f === 'obs') { l.obs = limpio(e.target.value).toUpperCase(); e.target.value = l.obs; e.target.classList.toggle('obs-req', !(Number(l.entregar) > 0) && !l.obs); return; }
   if (e.target.dataset.f === 'cant') {
@@ -1567,53 +1590,72 @@ $('solItems').addEventListener('change', e => {
   pintarLineasSol();
   if (e.target.dataset.f === 'cant') { const o = $('solItems').querySelector(`tr[data-i="${tr.dataset.i}"] [data-f="obs"]`); if (o && !(l.entregar > 0) && !l.obs) o.focus(); }
 });
-$('solItems').addEventListener('input', e => { if (e.target.dataset.f === 'obs' && SOL?.editable) { const l = SOL.lineas[+e.target.closest('tr').dataset.i]; l.obs = limpio(e.target.value).toUpperCase(); } });
+$('solItems').addEventListener('input', e => { if (e.target.dataset.f === 'obs' && SOL?.editable) { const l = lineaSol(e.target.closest('tr')); l.obs = limpio(e.target.value).toUpperCase(); } });
 $('solCerrar').addEventListener('click', () => $('dSol').close());
-$('solImprimir').addEventListener('click', () => { if (SOL) imprimirSolicitud(SOL.x, SOL.editable ? SOL : null); });
+$('solImprimir').addEventListener('click', () => {
+  if (!SOL) return;
+  if (SOL.partes.length === 1) return imprimirSolicitud(SOL.x, SOL.editable ? SOL.partes[0] : null);
+  // los dos del mismo pedido en una sola hoja (escritorio arriba, limpieza abajo)
+  const l = SOL.partes.map(({ x, lineas }) => !SOL.editable ? x : {
+    ...x, fechaEntrega: $('solFEnt').value, entregadoPor: limpio($('solEntPor').value), recibidoPor: limpio($('solRecPor').value),
+    entrega: lineas.map(li => { const p = li.prodId ? PRODUCTOS.get(li.prodId) : null, cu = p?.cProm || 0, cant = Number(li.entregar) || 0; return { codigo: p?.codigo || '', cant, unidad: p?.unidad || li.unidadSol, producto: p?.nombre || li.desc, desc: li.desc, cu, ct: r2(cu * cant), obs: li.obs, cantSol: li.cantSol }; })
+  });
+  imprimirSucursalUnaHoja(SOL.x.centroNombre || SOL.x.centro, l);
+});
 $('solRechazar').addEventListener('click', async e => {
-  const motivo = prompt('Motivo del rechazo (la sucursal lo verá):'); if (motivo === null) return;
+  const dos = SOL.partes.length > 1;
+  const motivo = prompt(`Motivo del rechazo${dos ? ` (se rechazan las solicitudes N.º ${nums(SOL.partes)})` : ''} (la sucursal lo verá):`); if (motivo === null) return;
   const b = e.currentTarget; ocupado(b, true);
-  try { await updateDoc(doc(db, 'solicitudes', SOL.x.id), { estado: 'RECHAZADA', motivo: limpio(motivo), atendidoPor: YO.nombre, atendidoMs: Date.now() }); $('dSol').close(); toast('Solicitud rechazada.'); cargarSolicitudes(); }
-  catch (err) { $('solMsg').textContent = errorTexto(err); }
+  try {
+    const lote = writeBatch(db);
+    SOL.partes.forEach(p => lote.update(doc(db, 'solicitudes', p.x.id), { estado: 'RECHAZADA', motivo: limpio(motivo), atendidoPor: YO.nombre, atendidoMs: Date.now() }));
+    await lote.commit();
+    $('dSol').close(); toast(dos ? `Solicitudes N.º ${nums(SOL.partes)} rechazadas.` : 'Solicitud rechazada.'); cargarSolicitudes();
+  } catch (err) { $('solMsg').textContent = errorTexto(err); }
   ocupado(b, false);
 });
 $('fSolAt').addEventListener('submit', async e => {
   e.preventDefault(); if (!SOL?.editable) return;
-  const x = SOL.x, fecha = $('solFEnt').value, recibe = limpio($('solRecPor').value).toUpperCase(), entrega = limpio($('solEntPor').value).toUpperCase();
+  const fecha = $('solFEnt').value, recibe = limpio($('solRecPor').value).toUpperCase(), entrega = limpio($('solEntPor').value).toUpperCase();
   const msg = t => { $('solMsg').textContent = t; };
   if (!fecha) return msg('Falta la fecha de entrega.');
   if (!recibe) return msg('Escribe quién recibe.');
-  const lineas = SOL.lineas.map(l => ({ ...l, entregar: r4(Number(l.entregar) || 0) }));
-  if (lineas.some(l => l.entregar > 0 && !l.prodId)) return msg('Hay materiales a entregar sin elegir su material del kardex (o pon 0 si no se entrega).');
-  if (!lineas.some(l => l.entregar > 0)) return msg('No hay nada para entregar. Si no se atenderá, usa “Rechazar”.');
-  const sinObs = lineas.map((l, i) => !(l.entregar > 0) && !limpio(l.obs) ? i + 1 : 0).filter(Boolean);
+  const dos = SOL.partes.length > 1, nombreParte = p => dos ? (tipoSolTxt(p.x) === 'LIMPIEZA' ? 'limpieza' : 'escritorio') + ' ' : '';
+  const partes = SOL.partes.map(p => ({ x: p.x, lineas: p.lineas.map(l => ({ ...l, entregar: r4(Number(l.entregar) || 0) })) }));
+  const todas = partes.flatMap(p => p.lineas);
+  if (todas.some(l => l.entregar > 0 && !l.prodId)) return msg('Hay materiales a entregar sin elegir su material del kardex (o pon 0 si no se entrega).');
+  if (!todas.some(l => l.entregar > 0)) return msg('No hay nada para entregar. Si no se atenderá, usa “Rechazar”.');
+  const sinObs = partes.flatMap(p => p.lineas.map((l, i) => !(l.entregar > 0) && !limpio(l.obs) ? nombreParte(p) + (i + 1) : '')).filter(Boolean);
   if (sinObs.length) { pintarLineasSol(); return msg(`Escribe la observación de lo que no se entrega (línea${sinObs.length > 1 ? 's' : ''} ${sinObs.join(', ')}). Por ejemplo: SIN STOCK.`); }
   const b = $('solEntregar'); ocupado(b, true, 'Registrando…'); msg('');
   try {
     await runTransaction(db, async tx => {
-      const ref = doc(db, 'solicitudes', x.id), s = await tx.get(ref);
-      if (!s.exists() || s.data().estado !== 'PENDIENTE') throw new Error('Esta solicitud ya fue atendida o rechazada por otra persona.');
+      const refs = partes.map(p => doc(db, 'solicitudes', p.x.id));
+      for (const r of refs) { const s = await tx.get(r); if (!s.exists() || s.data().estado !== 'PENDIENTE') throw new Error('Una de las solicitudes ya fue atendida o rechazada por otra persona.'); }
       const est = new Map();
-      for (const pid of new Set(lineas.filter(l => l.entregar > 0).map(l => l.prodId))) { const ps = await tx.get(doc(db, 'productos', pid)); if (!ps.exists()) throw new Error('Un material ya no existe en el kardex.'); est.set(pid, ps.data()); }
-      let ms = Date.now(), total = 0;
-      const detalle = lineas.map(l => {
-        const obs = limpio(l.obs).toUpperCase();
-        if (!(l.entregar > 0)) return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: '', producto: '', unidad: l.unidadSol, cant: 0, cu: 0, ct: 0, obs };
-        const p = est.get(l.prodId);
-        if (l.entregar > p.stock + 1e-9) throw new Error(`Stock insuficiente de ${p.nombre}: hay ${nq(p.stock)} ${p.unidad}.`);
-        const cu = p.cProm || 0, ct = r2(l.entregar * cu);
-        p.stock = r4(p.stock - l.entregar); p.valor = p.stock <= 1e-9 ? 0 : r2(p.valor - ct); p.cProm = p.stock > 0 ? r4(p.valor / p.stock) : 0; total += ct;
-        tx.set(doc(collection(db, 'movimientos')), {
-          productoId: l.prodId, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, fecha, ms: ms++, tipo: 'SALIDA', origen: 'CONSUMO',
-          documento: `Solicitud N.º ${x.numero}`, solicitudId: x.id, tercero: x.centro, persona: recibe, ...(obs ? { obs } : {}), cantSol: l.cantSol,
-          cant: l.entregar, cu, ct, saldoCant: p.stock, cProm: p.cProm, saldoValor: p.valor, usuario: YO.nombre, uid: YO.uid, creado: serverTimestamp()
+      for (const pid of new Set(todas.filter(l => l.entregar > 0).map(l => l.prodId))) { const ps = await tx.get(doc(db, 'productos', pid)); if (!ps.exists()) throw new Error('Un material ya no existe en el kardex.'); est.set(pid, ps.data()); }
+      let ms = Date.now();
+      partes.forEach((parte, k) => {
+        const x = parte.x; let total = 0;
+        const detalle = parte.lineas.map(l => {
+          const obs = limpio(l.obs).toUpperCase();
+          if (!(l.entregar > 0)) return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: '', producto: '', unidad: l.unidadSol, cant: 0, cu: 0, ct: 0, obs };
+          const p = est.get(l.prodId);
+          if (l.entregar > p.stock + 1e-9) throw new Error(`Stock insuficiente de ${p.nombre}: hay ${nq(p.stock)} ${p.unidad}.`);
+          const cu = p.cProm || 0, ct = r2(l.entregar * cu);
+          p.stock = r4(p.stock - l.entregar); p.valor = p.stock <= 1e-9 ? 0 : r2(p.valor - ct); p.cProm = p.stock > 0 ? r4(p.valor / p.stock) : 0; total += ct;
+          tx.set(doc(collection(db, 'movimientos')), {
+            productoId: l.prodId, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, fecha, ms: ms++, tipo: 'SALIDA', origen: 'CONSUMO',
+            documento: `Solicitud N.º ${x.numero}`, solicitudId: x.id, tercero: x.centro, persona: recibe, ...(obs ? { obs } : {}), cantSol: l.cantSol,
+            cant: l.entregar, cu, ct, saldoCant: p.stock, cProm: p.cProm, saldoValor: p.valor, usuario: YO.nombre, uid: YO.uid, creado: serverTimestamp()
+          });
+          return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, cant: l.entregar, cu, ct, obs };
         });
-        return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, cant: l.entregar, cu, ct, obs };
+        tx.update(refs[k], { estado: 'ATENDIDA', fechaEntrega: fecha, entregadoPor: entrega, recibidoPor: recibe, entrega: detalle, totalCosto: r2(total), atendidoPor: YO.nombre, atendidoMs: Date.now() });
       });
       for (const [pid, p] of est) tx.update(doc(db, 'productos', pid), { stock: p.stock, valor: p.valor, cProm: p.cProm, actMs: Date.now(), ultMov: fecha });
-      tx.update(ref, { estado: 'ATENDIDA', fechaEntrega: fecha, entregadoPor: entrega, recibidoPor: recibe, entrega: detalle, totalCosto: r2(total), atendidoPor: YO.nombre, atendidoMs: Date.now() });
     });
-    $('dSol').close(); toast(`Solicitud N.º ${x.numero} entregada y descontada del kardex.`); cargarSolicitudes();
+    $('dSol').close(); toast(`${dos ? 'Solicitudes' : 'Solicitud'} N.º ${nums(partes)} ${dos ? 'entregadas' : 'entregada'} y descontada${dos ? 's' : ''} del kardex.`); cargarSolicitudes();
   } catch (err) { msg(errorTexto(err)); }
   ocupado(b, false);
 });
