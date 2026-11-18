@@ -2,7 +2,7 @@
 // GitHub Pages + Firebase (Auth + Firestore). Lectura de comprobantes con Google Gemini.
 import { initializeApp, deleteApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updatePassword } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, deleteDoc, collection, query, where, orderBy, limit, onSnapshot, runTransaction, writeBatch, serverTimestamp, deleteField } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 import { CENTROS_COSTO } from './centros.js';
 
@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.18c'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.18d'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -1416,7 +1416,7 @@ function pintarSolicitudes() {
   $('solFilas').innerHTML = l.length ? l.map(x => `<tr><td><b>${x.numero}</b></td><td>${fmtF(x.fecha)}</td><td><span class="pill ${x.tipo === 'LIMPIEZA' ? 'AJUSTE' : 'ENTRADA'}">${tipoSolTxt(x)}</span></td><td>${esc(x.centroNombre || x.centro)}</td><td>${esc(x.solicitante)}</td>
       <td>${(x.items || []).length} material(es)<br><small class="nota">${esc((x.items || []).slice(0, 3).map(i => `${i.desc} (${nq(i.cant)})`).join(', '))}${(x.items || []).length > 3 ? '…' : ''}</small>${x.nota ? `<br><small class="nota">“${esc(x.nota)}”</small>` : ''}</td>
       <td><span class="pill ${x.estado === 'ATENDIDA' ? 'APROBADO' : x.estado === 'RECHAZADA' ? 'RECHAZADO' : 'PENDIENTE'}">${esc(estSol(x.estado))}</span>${x.fechaEntrega ? `<br><small class="nota">${fmtF(x.fechaEntrega)}</small>` : ''}</td>
-      <td><div class="acciones">${x.estado === 'PENDIENTE' && op ? `<button class="btn chico" data-sol="${esc(x.id)}">Atender</button>` : `<button class="btn sec chico" data-sol="${esc(x.id)}">Ver</button>`}<button class="btn sec chico" data-solxls="${esc(x.id)}" title="Descargar esta solicitud en Excel">Excel</button>${YO.rol === 'ADMIN' ? `<button class="btn peligro chico" data-soldel="${esc(x.id)}" title="Borrar esta solicitud">Borrar</button>` : ''}</div></td></tr>`).join('')
+      <td><div class="acciones">${x.estado === 'PENDIENTE' && op ? `<button class="btn chico" data-sol="${esc(x.id)}">Atender</button>` : `<button class="btn sec chico" data-sol="${esc(x.id)}">Ver</button>`}<button class="btn sec chico" data-solxls="${esc(x.id)}" title="Descargar esta solicitud en Excel">Excel</button>${YO.rol === 'ADMIN' && x.estado !== 'PENDIENTE' ? `<button class="btn sec chico" data-solrev="${esc(x.id)}" title="Deshace la entrega o el rechazo y la deja pendiente otra vez">Volver a pendiente</button>` : ''}${YO.rol === 'ADMIN' ? `<button class="btn peligro chico" data-soldel="${esc(x.id)}" title="Borrar esta solicitud">Borrar</button>` : ''}</div></td></tr>`).join('')
     : '<tr><td colspan="8" class="vacio">No hay solicitudes con este filtro.</td></tr>';
 }
 $('solEstado').addEventListener('change', () => { if ($('solEstado').value === 'PENDIENTE') $('solMes').value = ''; cargarSolicitudes(); });
@@ -1430,7 +1430,8 @@ $('solCsv').addEventListener('click', () => {
   descargarCSV(`solicitudes_${$('solMes').value || 'pendientes'}.csv`, f);
 });
 $('solFilas').addEventListener('click', async e => {
-  const a = e.target.closest('[data-sol]'), xl = e.target.closest('[data-solxls]'), del = e.target.closest('[data-soldel]');
+  const a = e.target.closest('[data-sol]'), xl = e.target.closest('[data-solxls]'), del = e.target.closest('[data-soldel]'), rev = e.target.closest('[data-solrev]');
+  if (rev) { const x = SOLS.lista.find(y => y.id === rev.dataset.solrev); if (x) volverAPendiente(x, rev); return; }
   if (a) abrirSolicitud(SOLS.lista.find(x => x.id === a.dataset.sol));
   if (xl) { const x = SOLS.lista.find(y => y.id === xl.dataset.solxls); if (x) excelSolicitud(x, xl); }
   if (del) {
@@ -1442,6 +1443,28 @@ $('solFilas').addEventListener('click', async e => {
     catch (err) { toast(errorTexto(err), true); ocupado(del, false); }
   }
 });
+
+// Volver a pendiente (solo ADMIN): borra las salidas que registró la entrega, recalcula el stock y deja la solicitud como nueva
+async function volverAPendiente(x, b) {
+  const entregada = x.estado === 'ATENDIDA';
+  if (!confirm(`¿Volver a PENDIENTE la solicitud N.º ${x.numero} (${tipoSolTxt(x).toLowerCase()}) de ${x.centroNombre || x.centro}?` +
+    (entregada ? '\n\nSe borrarán las salidas que registró en el kardex y el stock volverá a como estaba antes de la entrega.' : '\n\nSe quitará el rechazo.'))) return;
+  ocupado(b, true, 'Revirtiendo…');
+  try {
+    if (entregada) {
+      const ms = await getDocs(query(collection(db, 'movimientos'), where('solicitudId', '==', x.id)));
+      const pids = new Set(ms.docs.map(d => d.data().productoId));
+      let lote = writeBatch(db), n = 0;
+      for (const d of ms.docs) { lote.delete(d.ref); if (++n % 450 === 0) { await lote.commit(); lote = writeBatch(db); } }
+      if (n % 450) await lote.commit();
+      for (const pid of pids) if (pid) await recalcularProducto(pid); // stock, valor y costo promedio sin esas salidas
+    }
+    const quitar = {}; ['fechaEntrega', 'entregadoPor', 'recibidoPor', 'entrega', 'totalCosto', 'atendidoPor', 'atendidoMs', 'motivo'].forEach(c => { quitar[c] = deleteField(); });
+    await updateDoc(doc(db, 'solicitudes', x.id), { estado: 'PENDIENTE', ...quitar });
+    toast(`Solicitud N.º ${x.numero} otra vez pendiente.${entregada ? ' Se borraron sus salidas del kardex.' : ''}`);
+    cargarSolicitudes();
+  } catch (err) { toast(errorTexto(err), true); ocupado(b, false); }
+}
 
 /* Excel (.xlsx) de solicitudes */
 async function libroXlsx() { await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); return window.XLSX; }
