@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.18d'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.18e'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -1390,7 +1390,6 @@ function abrirSolicitudes() {
   $('solLink').innerHTML = `<b>Enlace para las sucursales</b> (no necesita usuario ni contraseña): <a href="${esc(urlSolicitud())}" target="_blank" rel="noopener">${esc(urlSolicitud())}</a> <button type="button" class="btn sec chico" id="solCopiar">Copiar enlace</button>`;
   $('solCopiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText(urlSolicitud()); toast('Enlace copiado. Envíalo a las sucursales.'); } catch (e) { prompt('Copia este enlace:', urlSolicitud()); } });
   sincronizarCatalogo();
-  opcionesSucursal();
   cargarSolicitudes();
 }
 async function cargarSolicitudes() {
@@ -1519,19 +1518,6 @@ async function excelPendientes(tipo, b) {
 $('solXlsE').addEventListener('click', e => excelPendientes('ESCRITORIO', e.currentTarget));
 $('solXlsL').addEventListener('click', e => excelPendientes('LIMPIEZA', e.currentTarget));
 
-// Imprimir por sucursal: escritorio y limpieza juntos, cada solicitud en su propia hoja
-function opcionesSucursal() {
-  const ant = $('solSuc').value;
-  $('solSuc').innerHTML = '<option value="">— Elegir sucursal —</option>' + (LISTAS.codigosCC || []).map(c => `<option value="${esc(c.codigo)}">${esc(c.codigo + (c.nombre ? ' · ' + c.nombre : ''))}</option>`).join('');
-  if (ant) $('solSuc').value = ant;
-}
-$('solImpSuc').addEventListener('click', () => {
-  const c = $('solSuc').value; if (!c) return toast('Elige la sucursal que quieres imprimir.', true);
-  const l = SOLS.lista.filter(x => String(x.centro) === c).sort((a, b) => (tipoSolTxt(a) === 'ESCRITORIO' ? 0 : 1) - (tipoSolTxt(b) === 'ESCRITORIO' ? 0 : 1) || a.numero - b.numero);
-  const nom = $('solSuc').selectedOptions[0].textContent, est = $('solEstado').selectedOptions[0].textContent.toLowerCase();
-  if (!l.length) return toast(`${nom} no tiene solicitudes en “${est}”.`, true);
-  imprimirSucursalUnaHoja(nom, l); // una sola hoja: escritorio arriba y limpieza abajo
-});
 
 // Atender: cada línea se enlaza con un material del kardex y se registra la salida
 let SOL = null;
