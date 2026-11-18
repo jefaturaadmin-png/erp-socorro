@@ -362,6 +362,12 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
         <div class="cab"><div><h2>Salida de materiales</h2><p class="nota">Entregas a cada área o centro de costos. Cada salida descuenta el stock del kardex a costo promedio.</p></div>
           <div class="acc"><button class="btn" type="button" id="sNueva">+ Nueva salida</button><button class="btn sec" type="button" id="sCsv">Exportar Excel</button></div></div>
         <div class="filtros">
+          <label class="crece">Imprimir por sucursal<select id="sSuc"></select></label>
+          <label>Día de entrega<input type="date" id="sDia" title="Vacío = todo el mes elegido abajo"></label>
+          <button class="btn" type="button" id="sImpSuc">Imprimir sucursal</button>
+          <p class="nota" style="margin:0;align-self:center">Imprime en una sola hoja lo entregado: útiles de escritorio arriba y limpieza abajo. Deja el día vacío para todo el mes.</p>
+        </div>
+        <div class="filtros">
           <label>Mes<input type="month" id="sMes"></label>
           <label>Tipo<select id="sTipo"><option value="SALIDA">Salidas</option><option value="AJUSTE">Ajustes</option><option value="">Salidas y ajustes</option></select></label>
           <label class="crece">Buscar<input type="search" id="sBuscar" placeholder="Producto, destino, persona o motivo"></label>
@@ -651,6 +657,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.18a"></script>
+<script type="module" src="app.js?v=2026.11.18b"></script>
 </body>
 </html>
