@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.19a'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.19b'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -247,7 +247,7 @@ function armarMenu() {
     if (m.grupo !== grupo) { grupo = m.grupo; h += `<div class="grupo">${esc(grupo)}</div>`; }
     h += `<button type="button" data-mod="${m.id}">${ICO[m.id] || ''}<span>${esc(m.nombre)}</span></button>`;
   });
-  $('menu').innerHTML = h + `<div class="nota" style="padding:16px 12px 8px;font-size:11px">Versión ${VERSION}</div>`;
+  $('menu').innerHTML = h + `<div style="padding:16px 12px 8px;font-size:11px;color:#8b939d">Versión ${VERSION}</div>`;
 }
 $('menu').addEventListener('click', e => { const b = e.target.closest('[data-mod]'); if (b) irA(b.dataset.mod); });
 function irA(id) {
@@ -338,22 +338,23 @@ function pintarComps(clase) {
   const usd = r2(vig.filter(c => c.moneda === 'USD').reduce((a, c) => a + c.total, 0));
   sec.querySelector('[data-r="res"]').innerHTML = `<span><b>${l.length}</b> comprobantes</span><span>Total: <b>S/ ${n2(pen)}</b>${usd ? ` · <b>US$ ${n2(usd)}</b>` : ''}</span>${serv ? `<span>Pendientes de aprobación: <b>${vig.filter(c => c.aprobacion?.estado === 'PENDIENTE').length}</b></span>` : ''}`;
   const st = EST[clase];
-  if (!l.some(c => c.id === st.sel)) st.sel = l[0]?.id || null; // se abre el primero de la lista
-  sec.querySelector('[data-r="filas"]').innerHTML = l.length ? l.map(c => {
+  if (st.sel && !l.some(c => c.id === st.sel)) st.sel = null;
+  sec.querySelector('[data-r="filas"]').innerHTML = l.length ? `<table class="lst"><thead><tr><th>Documento</th><th>Emisión</th><th>Proveedor</th><th class="opc">${serv ? 'Tipo de gasto' : 'Ítems'}</th><th class="num">Total</th><th>${serv ? 'Aprobación' : 'Estado'}</th></tr></thead><tbody>${l.map(c => {
     const anul = c.estado === 'ANULADO';
-    const est = anul ? '<span class="pill ANULADO">ANULADO</span>' : serv ? pill(c) : `<span class="gris">${(c.lineas || []).length} ítem(s)</span>`;
-    return `<button type="button" class="md-item${c.id === st.sel ? ' act' : ''}${anul ? ' anulado' : ''}" data-a="sel" data-id="${esc(c.id)}">
-      <div class="l1"><b>${esc(c.razon || 'SIN PROVEEDOR')}</b><span class="monto">${mon(c.moneda)} ${n2(c.total)}</span></div>
-      <div class="l2"><span>${esc(c.tipo)} ${esc(c.serie)}-${esc(c.numero)} <span class="gris">· ${fmtF(c.fechaEmision)}</span></span>${est}</div>
-      <div class="l3"><span>${esc(serv ? [c.gasto, c.centro].filter(Boolean).join(' · ') : (c.lineas || []).slice(0, 3).map(x => x.desc).join(', '))}</span></div></button>`;
-  }).join('') : `<div class="vacio">No hay comprobantes con este filtro.${puede('comprobantes') ? ' Usa “+ Nuevo ingreso” para registrar el primero.' : ''}</div>`;
+    const est = anul ? '<span class="pill ANULADO">ANULADO</span>' : serv ? pill(c) : '<span class="pill APROBADO">REGISTRADO</span>';
+    return `<tr class="${anul ? 'anulado' : ''}" data-a="sel" data-id="${esc(c.id)}"><td><a href="#" data-a="sel" data-id="${esc(c.id)}">${esc(c.serie)}-${esc(c.numero)}</a><span class="sub">${esc(c.tipo)}</span></td><td>${fmtF(c.fechaEmision)}</td>
+      <td>${esc(c.razon || 'SIN PROVEEDOR')}<span class="sub">RUC ${esc(c.ruc || '—')}</span></td>
+      <td class="opc">${serv ? `${esc(c.gasto || '')}<span class="sub">${esc(c.centro || '')}</span>` : `${(c.lineas || []).length} ítem(s)<span class="sub">${esc((c.lineas || []).slice(0, 2).map(x => x.desc).join(', '))}${(c.lineas || []).length > 2 ? '…' : ''}</span>`}</td>
+      <td class="num"><b>${mon(c.moneda)} ${n2(c.total)}</b></td><td>${est}</td></tr>`;
+  }).join('')}</tbody></table><div class="lst-pie">Total — ${l.length}</div>` : `<div class="vacio">No hay comprobantes con este filtro.${puede('comprobantes') ? ' Usa “+ Nuevo ingreso” para registrar el primero.' : ''}</div>`;
   pintarDetComp(clase);
 }
 // Documento del comprobante elegido, con su barra de acciones
 function pintarDetComp(clase) {
   const st = EST[clase], sec = secComp(clase), c = st.lista.find(x => x.id === st.sel), serv = clase === 'SERVICIO';
   const det = sec.querySelector('[data-r="det"]');
-  if (!c) { det.innerHTML = '<div class="vacio">Elige un comprobante de la lista para verlo.</div>'; return; }
+  sec.querySelector('.md').classList.toggle('ver-doc', !!c);
+  if (!c) { det.innerHTML = ''; return; }
   const anul = c.estado === 'ANULADO', pendiente = c.aprobacion?.estado === 'PENDIENTE', id = esc(c.id), m = mon(c.moneda);
   const acc = [];
   if (!anul && puede('comprobantes') && (serv ? pendiente : true)) acc.push(botonIco('editar', 'Editar', `data-a="editar" data-id="${id}"`));
@@ -367,7 +368,7 @@ function pintarDetComp(clase) {
     ['Condición de pago', esc(c.condicion || '—')], ['Forma de pago', esc(c.forma || '—')], ['Empresa', esc(c.empresa || '—')], ['Tipo de gasto', esc(c.gasto || '—')],
     ...(serv ? [['Centro de costos', esc(c.centro || '—')], ['Destino', esc(c.destino || '—')], ['¿Contable?', esc(c.contable || '—')]] : []),
     ['Registró', `${esc(c.creadoPor?.nombre || '—')}<br><small class="nota">${c.creadoMs ? new Date(c.creadoMs).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : ''}</small>`]];
-  det.innerHTML = `<div class="tb"><span class="tit">${esc(c.tipo)} ${esc(c.serie)}-${esc(c.numero)}</span>${acc.join('')}</div>
+  det.innerHTML = `<div class="tb">${botonIco('', '← Volver a la lista', 'data-a="volver"')}<span class="tit">${esc(c.tipo)} ${esc(c.serie)}-${esc(c.numero)}</span>${acc.join('')}</div>
     <div class="doc">
       <div class="doc-cab"><div><h3>${serv ? 'COMPROBANTE DE SERVICIO' : 'FACTURA DE COMPRA'}</h3><div class="sub">${esc(c.tipo)} N.º <b>${esc(c.serie)}-${esc(c.numero)}</b></div>${estado}</div>
         <div style="text-align:right"><div class="nota">Total</div><div style="font-size:24px;font-weight:bold">${m} ${n2(c.total)}</div>${c.totalPagar !== undefined && c.totalPagar !== c.total ? `<div class="nota">A pagar ${m} ${n2(c.totalPagar)}</div>` : ''}</div></div>
@@ -385,8 +386,9 @@ async function accionComp(clase, e) {
   if (a === 'csv') return exportarComps(clase);
   if (a === 'importar') { BTN_IMP = b; return $('kImpFile').click(); }
   if (a === 'deshacer') return deshacerImportacion(b);
+  if (a === 'volver') { EST[clase].sel = null; pintarDetComp(clase); return; }
   if (!c) return;
-  if (a === 'sel') { EST[clase].sel = c.id; secComp(clase).querySelectorAll('.md-item').forEach(x => x.classList.toggle('act', x.dataset.id === c.id)); return pintarDetComp(clase); }
+  if (a === 'sel') { e.preventDefault(); EST[clase].sel = c.id; pintarDetComp(clase); window.scrollTo(0, 0); return; }
   if (a === 'imprimir') return imprimirComp(c);
   if (a === 'xls') return excelComp(c, b);
   if (a === 'adjunto') { try { const d = await getDoc(doc(db, 'adjuntos', c.adjuntoId)); if (d.exists()) verAdjunto(d.data()); else toast('No se encontró el adjunto.', true); } catch (err) { toast(errorTexto(err), true); } return; }
@@ -1528,18 +1530,20 @@ const pillSol = x => `<span class="pill ${x.estado === 'ATENDIDA' ? 'APROBADO' :
 function pintarSolicitudes() {
   const l = filtrarSolicitudes();
   $('solRes').innerHTML = `<span><b>${l.length}</b> solicitudes</span><span>Pendientes: <b>${l.filter(x => x.estado === 'PENDIENTE').length}</b></span>`;
-  if (!l.some(x => x.id === SOLS.sel)) SOLS.sel = l[0]?.id || null;
-  $('solFilas').innerHTML = l.length ? l.map(x => `<button type="button" class="md-item${x.id === SOLS.sel ? ' act' : ''}" data-solsel="${esc(x.id)}">
-      <div class="l1"><b>${esc(x.centroNombre || x.centro)}</b>${pillSol(x)}</div>
-      <div class="l2"><span>N.º ${x.numero} · ${tipoSolTxt(x) === 'LIMPIEZA' ? '🧽 Limpieza' : '✏️ Escritorio'} <span class="gris">· ${fmtF(x.fecha)}</span></span><span class="gris">${(x.items || []).length} material(es)</span></div>
-      <div class="l3"><span>${esc(x.solicitante)}</span>${x.fechaEntrega ? `<span>Entregado ${fmtF(x.fechaEntrega)}</span>` : ''}</div></button>`).join('')
+  if (SOLS.sel && !l.some(x => x.id === SOLS.sel)) SOLS.sel = null;
+  $('solFilas').innerHTML = l.length ? `<table class="lst"><thead><tr><th>N.º</th><th>Fecha</th><th>Tipo</th><th>Sucursal / centro de costo</th><th class="opc">Solicitado por</th><th class="opc">Materiales</th><th>Estado</th></tr></thead><tbody>${l.map(x => `<tr data-solsel="${esc(x.id)}">
+      <td><a href="#" data-solsel="${esc(x.id)}">${x.numero}</a></td><td>${fmtF(x.fecha)}</td><td>${tipoSolTxt(x) === 'LIMPIEZA' ? '🧽 Limpieza' : '✏️ Escritorio'}</td>
+      <td>${esc(x.centroNombre || x.centro)}</td><td class="opc">${esc(x.solicitante)}</td>
+      <td class="opc">${(x.items || []).length} material(es)<span class="sub">${esc((x.items || []).slice(0, 2).map(i => i.desc).join(', '))}${(x.items || []).length > 2 ? '…' : ''}</span></td>
+      <td>${pillSol(x)}${x.fechaEntrega ? `<span class="sub">${fmtF(x.fechaEntrega)}</span>` : ''}</td></tr>`).join('')}</tbody></table><div class="lst-pie">Total — ${l.length}</div>`
     : '<div class="vacio">No hay solicitudes con este filtro.</div>';
   pintarDetSolicitud();
 }
 // Documento de la solicitud elegida, con su barra de acciones
 function pintarDetSolicitud() {
   const x = SOLS.lista.find(y => y.id === SOLS.sel);
-  if (!x) { $('solDet').innerHTML = '<div class="vacio">Elige una solicitud de la lista para verla.</div>'; return; }
+  $('solMD').classList.toggle('ver-doc', !!x);
+  if (!x) { $('solDet').innerHTML = ''; return; }
   const id = esc(x.id), entregada = !!x.entrega, op = puede('kardex'), adm = YO.rol === 'ADMIN', par = parejaDe(x);
   const acc = [];
   if (x.estado === 'PENDIENTE' && op) acc.push(botonIco('camion', par ? 'Atender (con N.º ' + par.numero + ')' : 'Atender', `data-sol="${id}"`, 'prim'));
@@ -1553,7 +1557,7 @@ function pintarDetSolicitud() {
   const filas = entregada
     ? x.entrega.map((i, k) => { const no = !(i.cant > 0); return `<tr class="${no ? 'sol-no' : i.cantSol && i.cant < i.cantSol ? 'sol-parcial' : ''}"><td>${k + 1}</td><td>${esc(i.producto || i.desc)}${i.producto && i.producto !== i.desc ? `<br><small class="nota">Pidió: ${esc(i.desc)}</small>` : ''}</td><td class="num">${nq(i.cantSol)}</td><td class="num"><b>${no ? '—' : nq(i.cant)}</b> ${esc(i.unidad || '')}</td><td>${no ? '<span class="obs-txt">NO ATENDIDO</span> ' : ''}${i.obs ? `<span class="obs-txt">${esc(i.obs)}</span>` : ''}</td><td class="num">${no ? '' : n2(i.cu)}</td><td class="num">${no ? '' : n2(i.ct)}</td></tr>`; }).join('')
     : (x.items || []).map((i, k) => { const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.desc); const falta = p && p.stock + 1e-9 < i.cant; return `<tr><td>${k + 1}</td><td>${esc(i.desc)}${p ? `<br><small class="nota">${esc(p.codigo)}</small>` : '<br><small class="nota">No está en el kardex</small>'}</td><td class="num"><b>${nq(i.cant)}</b> ${esc(i.unidad || '')}</td><td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td></tr>`; }).join('');
-  $('solDet').innerHTML = `<div class="tb"><span class="tit">Solicitud N.º ${x.numero}</span>${acc.join('')}</div>
+  $('solDet').innerHTML = `<div class="tb">${botonIco('', '← Volver a la lista', 'data-solvolver="1"')}<span class="tit">Solicitud N.º ${x.numero}</span>${acc.join('')}</div>
     <div class="doc">
       <div class="doc-cab"><div><h3>${tipoSolTxt(x) === 'LIMPIEZA' ? '🧽 MATERIALES DE LIMPIEZA' : '✏️ ÚTILES DE ESCRITORIO'}</h3><div class="sub">Solicitud N.º <b>${x.numero}</b> · ${esc(x.centroNombre || x.centro)}</div>${est}</div>
         ${entregada ? `<div style="text-align:right"><div class="nota">Costo de lo entregado</div><div style="font-size:24px;font-weight:bold">S/ ${n2(x.totalCosto)}</div></div>` : `<div style="text-align:right"><div class="nota">Materiales</div><div style="font-size:24px;font-weight:bold">${(x.items || []).length}</div></div>`}</div>
@@ -1578,7 +1582,8 @@ $('solMD').addEventListener('click', async e => {
   const a = e.target.closest('[data-sol]'), xl = e.target.closest('[data-solxls]'), del = e.target.closest('[data-soldel]'), rev = e.target.closest('[data-solrev]');
   if (rev) { const x = SOLS.lista.find(y => y.id === rev.dataset.solrev); if (x) volverAPendiente(x, rev); return; }
   const sel = e.target.closest('[data-solsel]'), imp = e.target.closest('[data-solimp]');
-  if (sel) { SOLS.sel = sel.dataset.solsel; $('solFilas').querySelectorAll('.md-item').forEach(y => y.classList.toggle('act', y.dataset.solsel === SOLS.sel)); pintarDetSolicitud(); return; }
+  if (sel) { e.preventDefault(); SOLS.sel = sel.dataset.solsel; pintarDetSolicitud(); window.scrollTo(0, 0); return; }
+  if (e.target.closest('[data-solvolver]')) { SOLS.sel = null; pintarDetSolicitud(); return; }
   if (imp) { const x = SOLS.lista.find(y => y.id === imp.dataset.solimp), par = x && parejaDe(x); if (x) { if (par) imprimirSucursalUnaHoja(x.centroNombre || x.centro, [x, par]); else imprimirSolicitud(x); } return; }
   if (a) abrirSolicitud(SOLS.lista.find(x => x.id === a.dataset.sol));
   if (xl) { const x = SOLS.lista.find(y => y.id === xl.dataset.solxls); if (x) excelSolicitud(x, xl); }

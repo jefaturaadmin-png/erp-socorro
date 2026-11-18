@@ -7,10 +7,11 @@
 <title>ERP Socorro</title>
 <link rel="icon" href="logo.png">
 <style>
-/* Barra naranja de marca arriba, menú de módulos a la izquierda, área de trabajo a la derecha */
+/* Estilo sencillo: barra blanca arriba, menú oscuro a la izquierda, verde como color principal */
 :root{
-  --marca:#fe6e00; --pri:#d95a00; --pri-osc:#b84c00; --suave:#fff0e0; --suave2:#fffaf4;
-  --fondo:#f7f5f2; --blanco:#ffffff; --borde:#e3e0dd; --texto:#2b2f33; --gris:#6b6f73;
+  --marca:#2f9e44; --pri:#2f9e44; --pri-osc:#237a35; --suave:#e8f5eb; --suave2:#f5faf6; --azul:#1a6fd6;
+  --lateral:#2b3037; --lateral2:#363c45; --lateral3:#424a54;
+  --fondo:#f4f5f7; --blanco:#ffffff; --borde:#e1e4e8; --texto:#22262b; --gris:#6b7280;
   --rojo:#b3261e; --rojo-f:#fdecea; --ok:#1b7a4b; --ok-f:#e6f4ec; --ambar:#8a5300; --ambar-f:#fff4dc;
 }
 *{box-sizing:border-box}
@@ -28,8 +29,8 @@ h3{font-size:15px;margin:0 0 8px}
 /* Botones */
 .btn{background:var(--pri);color:#fff;border:1px solid var(--pri);border-radius:6px;padding:8px 14px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--pri-osc)}
-.btn.sec{background:var(--blanco);color:var(--pri)}
-.btn.sec:hover{background:var(--suave)}
+.btn.sec{background:var(--blanco);color:#374151;border-color:#d1d5db}
+.btn.sec:hover{background:#f3f4f6}
 .btn.peligro{background:var(--blanco);color:var(--rojo);border-color:var(--rojo)}
 .btn.chico{padding:4px 9px;font-size:12.5px}
 .btn:disabled{opacity:.55;cursor:default}
@@ -49,21 +50,22 @@ input:disabled,select:disabled,textarea:disabled{background:#f4f2ef;color:#444}
 .msg{font-size:13px;color:var(--rojo);min-height:1em;text-align:center}
 
 /* App */
-.top{background:var(--marca);color:#fff;display:flex;align-items:center;gap:12px;padding:0 18px;height:54px;position:sticky;top:0;z-index:5}
+.top{background:var(--blanco);color:var(--texto);display:flex;align-items:center;gap:12px;padding:0 18px;height:54px;position:sticky;top:0;z-index:5;border-bottom:1px solid var(--borde);box-shadow:0 1px 3px rgba(0,0,0,.04)}
 .top img{width:34px;height:34px;border-radius:8px;background:#fff}
 .top h1{font-size:18px;margin:0;letter-spacing:.3px}
 .top .yo{margin-left:auto;font-size:13px;text-align:right;line-height:1.2}
 .top .yo small{opacity:.85}
-.top button{background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12.5px}
-.top button:hover{background:rgba(255,255,255,.32)}
-.cuerpo{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100% - 54px)}
-.side{background:var(--blanco);border-right:1px solid var(--borde);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
-.side button{background:none;border:0;text-align:left;padding:9px 12px;border-radius:6px;cursor:pointer;font-size:13.5px;color:var(--texto);display:flex;align-items:center;gap:10px}
-.side button svg{color:var(--gris)}
-.side button.act svg{color:var(--pri)}
-.side button:hover{background:var(--suave2)}
-.side button.act{background:var(--suave);color:var(--pri-osc);font-weight:bold;box-shadow:inset 3px 0 var(--marca)}
-.side .grupo{font-size:11px;letter-spacing:.6px;color:var(--gris);padding:12px 12px 4px;text-transform:uppercase}
+.top button{background:var(--blanco);border:1px solid #d1d5db;color:#374151;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12.5px}
+.top button:hover{background:#f3f4f6}
+.cuerpo{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100vh - 54px)}
+body{background:var(--fondo)}
+.side{background:var(--lateral);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.side button{background:none;border:0;text-align:left;padding:10px 12px;border-radius:6px;cursor:pointer;font-size:13.5px;color:#d7dbe0;display:flex;align-items:center;gap:11px}
+.side button svg{color:#9aa3ad}
+.side button.act svg{color:#fff}
+.side button:hover{background:var(--lateral2);color:#fff}
+.side button.act{background:var(--lateral3);color:#fff;font-weight:bold;box-shadow:inset 3px 0 var(--pri)}
+.side .grupo{font-size:11px;letter-spacing:.6px;color:#8b939d;padding:14px 12px 4px;text-transform:uppercase}
 .main{padding:20px 22px;min-width:0}
 .mod{display:flex;flex-direction:column;gap:14px}
 .cab{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
@@ -75,7 +77,7 @@ input:disabled,select:disabled,textarea:disabled{background:#f4f2ef;color:#444}
 /* Tablas */
 .tabla{overflow:auto;background:var(--blanco);border:1px solid var(--borde);border-radius:8px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:#f3f1ee;text-align:left;font-size:12px;color:#555;padding:8px 9px;border-bottom:1px solid var(--borde);white-space:nowrap;position:sticky;top:0}
+th{background:#f3f4f6;text-align:left;font-size:12.5px;color:#4b5563;padding:10px 10px;font-weight:600;border-bottom:1px solid var(--borde);white-space:nowrap;position:sticky;top:0}
 td{padding:7px 9px;border-bottom:1px solid #efecea;vertical-align:top}
 tbody tr:hover{background:var(--suave2)}
 tr.sel{background:var(--suave)!important}
@@ -92,8 +94,20 @@ tr.anulado td:last-child{text-decoration:none}
 .acciones{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 
 /* Vista lista + documento (como un sistema de inventario: lista a la izquierda, documento a la derecha) */
-.md{display:grid;grid-template-columns:minmax(300px,4fr) minmax(0,8fr);gap:14px;align-items:start}
-.md-lista{background:var(--blanco);border:1px solid var(--borde);border-radius:10px;overflow:auto;max-height:calc(100vh - 230px);position:sticky;top:66px}
+.md{display:block}
+.md .md-det{display:none}
+.md.ver-doc .md-lista{display:none}
+.md.ver-doc .md-det{display:block}
+.md-lista{background:var(--blanco);border:1px solid var(--borde);border-radius:8px;overflow:auto}
+.lst{font-size:13.5px}
+.lst td{padding:12px 10px;vertical-align:top;border-bottom:1px solid #edf0f2}
+.lst tbody tr{cursor:pointer}
+.lst tbody tr:hover td{background:#f8fafb}
+.lst a,.lnk-doc{color:var(--azul);text-decoration:none;font-weight:600}
+.lst tr:hover a{text-decoration:underline}
+.lst .sub{display:block;color:var(--gris);font-size:12px;margin-top:2px}
+.lst tr.anulado td{color:#9aa0a6;text-decoration:line-through}
+.lst-pie{padding:10px 12px;color:var(--gris);font-size:13px}
 .md-item{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #efecea;padding:11px 14px;cursor:pointer;font:inherit;color:inherit;border-left:3px solid transparent}
 .md-item:hover{background:var(--suave2)}
 .md-item.act{background:var(--suave);border-left-color:var(--marca)}
@@ -132,7 +146,7 @@ tr.anulado td:last-child{text-decoration:none}
 .doc .aviso-par{background:#eef5fb;border:1px solid #cfe2f1;color:#1d4f73;border-radius:8px;padding:8px 12px;font-size:13px}
 .doc .aviso-par button{background:none;border:0;color:#1d4f73;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .sub-tit{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--pri-osc);font-weight:bold;margin:0}
-@media (max-width:1000px){ .md{grid-template-columns:1fr} .md-lista{position:static;max-height:45vh} .tb{position:static} }
+@media (max-width:1000px){ .tb{position:static} .lst .opc{display:none} }
 
 /* Tarjetas de resumen */
 .tarjetas{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
@@ -236,7 +250,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 #kVista[hidden]{display:none}
 #kVista .panel{align-self:stretch}
 .tk{display:flex;flex-direction:column;gap:10px}
-.tk-cab{display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,var(--marca),var(--pri));color:#fff;border-radius:8px;padding:8px 10px}
+.tk-cab{display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,var(--lateral),var(--lateral3));color:#fff;border-radius:8px;padding:8px 10px}
 .tk-cab h3{flex:1;margin:0;text-align:center;font-size:20px;letter-spacing:1.5px;color:#fff}
 .tk-num{background:#fff;color:var(--rojo);border-radius:6px;padding:5px 12px;font-size:15px;white-space:nowrap}
 .tk-num b{font-size:17px}
@@ -705,6 +719,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.19a"></script>
+<script type="module" src="app.js?v=2026.11.19b"></script>
 </body>
 </html>
