@@ -39,6 +39,11 @@ td.c{text-align:center;color:var(--gris);width:28px}
 .pill.ATENDIDA{background:var(--ok-f);color:var(--ok)}
 .pill.RECHAZADA{background:var(--rojo-f);color:var(--rojo)}
 [hidden]{display:none!important}
+.marca{display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--borde)}
+.marca img{width:40px;height:40px;border-radius:9px}
+.marca b{display:block;font-size:15px}.marca small{color:var(--gris);font-size:12px}
+.caja{box-shadow:0 2px 12px rgba(0,0,0,.05)}
+.bloque{box-shadow:0 1px 4px rgba(0,0,0,.04)}
 input[readonly]{background:#f3f1ee;color:var(--gris);cursor:default}
 input[readonly]:focus{outline:none;border-color:var(--borde)}
 /* Buscador de materiales: aparece mientras se escribe */
@@ -62,6 +67,7 @@ input[readonly]:focus{outline:none;border-color:var(--borde)}
   <div class="aviso" id="carga">Cargando…</div>
   <div class="aviso ok" id="sOk" hidden></div>
   <form class="caja" id="fSol" hidden novalidate>
+    <div class="marca"><img src="logo.png" alt=""><div><b>Farmacia Socorro</b><small>Solicitud de materiales</small></div></div>
     <h2>FORMATO DE CONSUMO DE MATERIALES</h2>
     <div class="g3">
       <label>Sucursal / centro de costo<select id="sCentro" required><option value="">— Elegir —</option></select></label>
@@ -84,6 +90,6 @@ input[readonly]:focus{outline:none;border-color:var(--borde)}
     <div class="acc"><p class="nota">Administración revisará tu pedido y te avisará cuando esté listo para entregar.</p><button type="submit" class="btn" id="sEnviar">Enviar solicitud</button></div>
   </form>
 </main>
-<script type="module" src="solicitud.js?v=2026.11.06s"></script>
+<script type="module" src="solicitud.js?v=2026.11.19a"></script>
 </body>
 </html>

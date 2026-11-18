@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.18f'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.19a'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -214,12 +214,38 @@ $('bClave').addEventListener('click', async () => {
   try { await updatePassword(auth.currentUser, n); toast('Contraseña cambiada.'); } catch (e) { toast(errorTexto(e), true); }
 });
 
+// Íconos (trazos simples) para el menú y las barras de acciones
+const SVG = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICO = {
+  editar: SVG('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+  imprimir: SVG('<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>'),
+  excel: SVG('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>'),
+  borrar: SVG('<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>'),
+  ok: SVG('<path d="M20 6 9 17l-5-5"/>'),
+  x: SVG('<path d="M18 6 6 18M6 6l12 12"/>'),
+  deshacer: SVG('<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>'),
+  clip: SVG('<path d="M21.4 11.1 12.2 20.3a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/>'),
+  camion: SVG('<path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>'),
+  anular: SVG('<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>'),
+  inicio: SVG('<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>'),
+  solicitudes: SVG('<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/>'),
+  servicios: SVG('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>'),
+  compras: SVG('<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/>'),
+  kardex: SVG('<path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/>'),
+  rrhh: SVG('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>'),
+  cargo: SVG('<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/>'),
+  usuarios: SVG('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+  config: SVG('<circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>')
+};
+ICO.salidas = ICO.camion;
+const botonIco = (ico, txt, attrs, clase = '') => `<button type="button" class="ico ${clase}" ${attrs}>${ICO[ico] || ''}<span>${txt}</span></button>`;
+
 /* ================= Menú ================= */
 function armarMenu() {
   let grupo = '', h = '';
   MODULOS.filter(m => ACCESO[YO.rol].includes(m.id)).forEach(m => {
     if (m.grupo !== grupo) { grupo = m.grupo; h += `<div class="grupo">${esc(grupo)}</div>`; }
-    h += `<button type="button" data-mod="${m.id}">${esc(m.nombre)}</button>`;
+    h += `<button type="button" data-mod="${m.id}">${ICO[m.id] || ''}<span>${esc(m.nombre)}</span></button>`;
   });
   $('menu').innerHTML = h + `<div class="nota" style="padding:16px 12px 8px;font-size:11px">Versión ${VERSION}</div>`;
 }
@@ -280,7 +306,7 @@ function abrirComps(clase) {
         <label class="crece">Buscar<input type="search" data-f="q" placeholder="Proveedor, RUC, serie, número o concepto"></label>
       </div>
       <div class="resumen" data-r="res"></div>
-      <div class="tabla"><table><thead><tr><th>Emisión</th><th>Documento</th><th>Proveedor</th><th>Empresa</th><th>${serv ? 'Tipo de gasto · C. costos' : 'Ítems'}</th><th class="num">Total</th><th>Vence</th>${serv ? '<th>Aprobación</th>' : ''}<th></th></tr></thead><tbody data-r="filas"><tr><td colspan="9" class="vacio">Cargando…</td></tr></tbody></table></div>`;
+      <div class="md"><div class="md-lista" data-r="filas"><div class="vacio">Cargando…</div></div><div class="md-det" data-r="det"><div class="vacio">Elige un comprobante de la lista para verlo.</div></div></div>`;
     sec.addEventListener('click', e => accionComp(clase, e));
     sec.querySelector('[data-f="mes"]').addEventListener('change', e => { st.mes = e.target.value; cargarComps(clase); });
     ['empresa', 'aprob', 'q'].forEach(f => sec.querySelector(`[data-f="${f}"]`).addEventListener('input', () => pintarComps(clase)));
@@ -296,7 +322,7 @@ async function cargarComps(clase) {
     st.lista = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.clase === clase)
       .sort((a, b) => (b.fechaEmision || '').localeCompare(a.fechaEmision || '') || (b.creadoMs || 0) - (a.creadoMs || 0));
     pintarComps(clase);
-  } catch (e) { sec.querySelector('[data-r="filas"]').innerHTML = `<tr><td colspan="9"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
+  } catch (e) { sec.querySelector('[data-r="filas"]').innerHTML = `<div class="aviso error">${esc(errorTexto(e))}</div>`; }
 }
 function filtrarComps(clase) {
   const sec = secComp(clase), f = n => sec.querySelector(`[data-f="${n}"]`).value;
@@ -311,16 +337,46 @@ function pintarComps(clase) {
   const pen = r2(vig.filter(c => c.moneda !== 'USD').reduce((a, c) => a + c.total, 0));
   const usd = r2(vig.filter(c => c.moneda === 'USD').reduce((a, c) => a + c.total, 0));
   sec.querySelector('[data-r="res"]').innerHTML = `<span><b>${l.length}</b> comprobantes</span><span>Total: <b>S/ ${n2(pen)}</b>${usd ? ` · <b>US$ ${n2(usd)}</b>` : ''}</span>${serv ? `<span>Pendientes de aprobación: <b>${vig.filter(c => c.aprobacion?.estado === 'PENDIENTE').length}</b></span>` : ''}`;
+  const st = EST[clase];
+  if (!l.some(c => c.id === st.sel)) st.sel = l[0]?.id || null; // se abre el primero de la lista
   sec.querySelector('[data-r="filas"]').innerHTML = l.length ? l.map(c => {
-    const anul = c.estado === 'ANULADO', pendiente = c.aprobacion?.estado === 'PENDIENTE';
-    const acc = [`<button class="btn sec chico" data-a="ver" data-id="${esc(c.id)}">Ver</button>`];
-    // Materiales: solo Ver y Editar (sin aprobación ni anulación)
-    if (!anul && puede('comprobantes') && (serv ? pendiente : true)) acc.push(`<button class="btn sec chico" data-a="editar" data-id="${esc(c.id)}">Editar</button>`);
-    if (serv && !anul && pendiente && puede('aprobar')) acc.push(`<button class="btn chico" data-a="aprobar" data-id="${esc(c.id)}">Aprobar</button><button class="btn peligro chico" data-a="rechazar" data-id="${esc(c.id)}">Rechazar</button>`);
-    if (serv && !anul && puede('comprobantes')) acc.push(`<button class="btn peligro chico" data-a="anular" data-id="${esc(c.id)}">Anular</button>`);
-    const det = serv ? `${esc(c.gasto || '')}<br><small class="nota">${esc(c.centro || '')}</small>` : `${(c.lineas || []).length} ítem(s)<br><small class="nota">${esc((c.lineas || []).slice(0, 2).map(x => x.desc).join(', '))}${(c.lineas || []).length > 2 ? '…' : ''}</small>`;
-    return `<tr class="${anul ? 'anulado' : ''}"><td>${fmtF(c.fechaEmision)}</td><td>${esc(c.tipo)}<br><b>${esc(c.serie)}-${esc(c.numero)}</b></td><td>${esc(c.razon)}<br><small class="nota">${esc(c.ruc)}</small></td><td>${esc(c.empresa)}</td><td>${det}</td><td class="num">${mon(c.moneda)} ${n2(c.total)}${c.detMonto ? `<br><small class="nota">Detr. ${n2(c.detMonto)}</small>` : ''}${c.retMonto ? `<br><small class="nota">Ret. ${n2(c.retMonto)}</small>` : ''}</td><td>${fmtF(c.fechaVence)}</td>${serv ? `<td>${pill(c)}${c.aprobacion?.usuario ? `<br><small class="nota">${esc(c.aprobacion.usuario)}</small>` : ''}</td>` : ''}<td><div class="acciones">${acc.join('')}</div></td></tr>`;
-  }).join('') : `<tr><td colspan="9" class="vacio">No hay comprobantes con este filtro.${puede('comprobantes') ? ' Usa “+ Nuevo ingreso” para registrar el primero.' : ''}</td></tr>`;
+    const anul = c.estado === 'ANULADO';
+    const est = anul ? '<span class="pill ANULADO">ANULADO</span>' : serv ? pill(c) : `<span class="gris">${(c.lineas || []).length} ítem(s)</span>`;
+    return `<button type="button" class="md-item${c.id === st.sel ? ' act' : ''}${anul ? ' anulado' : ''}" data-a="sel" data-id="${esc(c.id)}">
+      <div class="l1"><b>${esc(c.razon || 'SIN PROVEEDOR')}</b><span class="monto">${mon(c.moneda)} ${n2(c.total)}</span></div>
+      <div class="l2"><span>${esc(c.tipo)} ${esc(c.serie)}-${esc(c.numero)} <span class="gris">· ${fmtF(c.fechaEmision)}</span></span>${est}</div>
+      <div class="l3"><span>${esc(serv ? [c.gasto, c.centro].filter(Boolean).join(' · ') : (c.lineas || []).slice(0, 3).map(x => x.desc).join(', '))}</span></div></button>`;
+  }).join('') : `<div class="vacio">No hay comprobantes con este filtro.${puede('comprobantes') ? ' Usa “+ Nuevo ingreso” para registrar el primero.' : ''}</div>`;
+  pintarDetComp(clase);
+}
+// Documento del comprobante elegido, con su barra de acciones
+function pintarDetComp(clase) {
+  const st = EST[clase], sec = secComp(clase), c = st.lista.find(x => x.id === st.sel), serv = clase === 'SERVICIO';
+  const det = sec.querySelector('[data-r="det"]');
+  if (!c) { det.innerHTML = '<div class="vacio">Elige un comprobante de la lista para verlo.</div>'; return; }
+  const anul = c.estado === 'ANULADO', pendiente = c.aprobacion?.estado === 'PENDIENTE', id = esc(c.id), m = mon(c.moneda);
+  const acc = [];
+  if (!anul && puede('comprobantes') && (serv ? pendiente : true)) acc.push(botonIco('editar', 'Editar', `data-a="editar" data-id="${id}"`));
+  if (serv && !anul && pendiente && puede('aprobar')) acc.push(botonIco('ok', 'Aprobar', `data-a="aprobar" data-id="${id}"`, 'prim'), botonIco('x', 'Rechazar', `data-a="rechazar" data-id="${id}"`, 'peligro'));
+  acc.push(botonIco('imprimir', 'Imprimir', `data-a="imprimir" data-id="${id}"`), botonIco('excel', 'Excel', `data-a="xls" data-id="${id}"`));
+  if (c.adjuntoId) acc.push(botonIco('clip', 'Adjunto', `data-a="adjunto" data-id="${id}"`));
+  if (serv && !anul && puede('comprobantes')) acc.push(botonIco('anular', 'Anular', `data-a="anular" data-id="${id}"`, 'peligro'));
+  if (YO.rol === 'ADMIN') acc.push(botonIco('borrar', 'Borrar', `data-a="borrar" data-id="${id}"`, 'peligro'));
+  const estado = anul ? '<span class="estado no">ANULADO</span>' : serv ? `<span class="estado ${pendiente ? 'am' : c.aprobacion?.estado === 'APROBADO' ? 'ok' : 'no'}">${esc(c.aprobacion?.estado || 'PENDIENTE')}</span>` : '<span class="estado ok">REGISTRADO · EN KARDEX</span>';
+  const datos = [['Proveedor', `${esc(c.razon || '—')}<br><small class="nota">RUC ${esc(c.ruc || '—')}</small>`], ['Fecha de emisión', fmtF(c.fechaEmision)], ['Vencimiento', fmtF(c.fechaVence) || '—'],
+    ['Condición de pago', esc(c.condicion || '—')], ['Forma de pago', esc(c.forma || '—')], ['Empresa', esc(c.empresa || '—')], ['Tipo de gasto', esc(c.gasto || '—')],
+    ...(serv ? [['Centro de costos', esc(c.centro || '—')], ['Destino', esc(c.destino || '—')], ['¿Contable?', esc(c.contable || '—')]] : []),
+    ['Registró', `${esc(c.creadoPor?.nombre || '—')}<br><small class="nota">${c.creadoMs ? new Date(c.creadoMs).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : ''}</small>`]];
+  det.innerHTML = `<div class="tb"><span class="tit">${esc(c.tipo)} ${esc(c.serie)}-${esc(c.numero)}</span>${acc.join('')}</div>
+    <div class="doc">
+      <div class="doc-cab"><div><h3>${serv ? 'COMPROBANTE DE SERVICIO' : 'FACTURA DE COMPRA'}</h3><div class="sub">${esc(c.tipo)} N.º <b>${esc(c.serie)}-${esc(c.numero)}</b></div>${estado}</div>
+        <div style="text-align:right"><div class="nota">Total</div><div style="font-size:24px;font-weight:bold">${m} ${n2(c.total)}</div>${c.totalPagar !== undefined && c.totalPagar !== c.total ? `<div class="nota">A pagar ${m} ${n2(c.totalPagar)}</div>` : ''}</div></div>
+      <div class="doc-datos">${datos.map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('')}</div>
+      ${c.aprobacion?.motivo ? `<div class="aviso">Motivo: ${esc(c.aprobacion.motivo)}</div>` : ''}${c.notas ? `<div class="nota">Anotaciones: ${esc(c.notas)}</div>` : ''}
+      <div class="tabla"><table><thead><tr><th>#</th><th>${serv ? 'Concepto' : 'Producto'}</th><th class="num">Cantidad</th><th class="num">P. unit sin IGV</th><th class="num">Subtotal</th><th class="num">IGV</th><th class="num">Total</th></tr></thead>
+      <tbody>${(c.lineas || []).map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.desc)}${x.codigo ? `<br><small class="nota">${esc(x.codigo)}</small>` : ''}</td><td class="num">${nq(x.cant)} ${esc(x.unidad || '')}</td><td class="num">${n2(x.vu)}</td><td class="num">${n2(x.sub)}</td><td class="num">${n2(x.igv)}</td><td class="num">${n2(x.tot)}</td></tr>`).join('') || '<tr><td colspan="7" class="vacio">Sin ítems.</td></tr>'}</tbody></table></div>
+      <div class="tots"><span>Subtotal</span><b>${m} ${n2(c.subtotal)}</b><span>IGV</span><b>${m} ${n2(c.igv)}</b>${c.detMonto ? `<span>Detracción</span><b>${m} ${n2(c.detMonto)}</b>` : ''}${c.retMonto ? `<span>Retención IR</span><b>${m} ${n2(c.retMonto)}</b>` : ''}<span class="g">Total</span><b class="g">${m} ${n2(c.total)}</b></div>
+    </div>`;
 }
 async function accionComp(clase, e) {
   const b = e.target.closest('[data-a]'); if (!b) return;
@@ -330,6 +386,11 @@ async function accionComp(clase, e) {
   if (a === 'importar') { BTN_IMP = b; return $('kImpFile').click(); }
   if (a === 'deshacer') return deshacerImportacion(b);
   if (!c) return;
+  if (a === 'sel') { EST[clase].sel = c.id; secComp(clase).querySelectorAll('.md-item').forEach(x => x.classList.toggle('act', x.dataset.id === c.id)); return pintarDetComp(clase); }
+  if (a === 'imprimir') return imprimirComp(c);
+  if (a === 'xls') return excelComp(c, b);
+  if (a === 'adjunto') { try { const d = await getDoc(doc(db, 'adjuntos', c.adjuntoId)); if (d.exists()) verAdjunto(d.data()); else toast('No se encontró el adjunto.', true); } catch (err) { toast(errorTexto(err), true); } return; }
+  if (a === 'borrar') return borrarComp(clase, c, b);
   if (a === 'ver') return abrirEditor(clase, c, 'ver');
   if (a === 'editar') return abrirEditor(clase, c, 'editar');
   if (a === 'aprobar' || a === 'rechazar') {
@@ -348,6 +409,60 @@ async function accionComp(clase, e) {
     try { await anularComp(c); toast('Comprobante anulado.'); cargarComps(clase); }
     catch (err) { toast(errorTexto(err), true); ocupado(b, false); }
   }
+}
+function imprimirComp(c) {
+  const serv = c.clase === 'SERVICIO', m = mon(c.moneda);
+  const w = window.open('', '_blank'); if (!w) return toast('El navegador bloqueó la ventana. Permite las ventanas emergentes para imprimir.', true);
+  w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(c.tipo)} ${esc(c.serie)}-${esc(c.numero)}</title><style>
+    body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:28px;font-size:13px}.cab{display:flex;justify-content:space-between;align-items:flex-start}.cab img{width:60px}
+    h1{font-size:20px;margin:0}.g{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 20px;margin:18px 0}.g div{font-size:11px;color:#666;text-transform:uppercase}.g b{display:block;color:#222;font-size:13px;text-transform:none}
+    table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left}th{background:#f2f2f2;font-size:11px;text-transform:uppercase}.n{text-align:right}
+    .t{margin-left:auto;width:280px;margin-top:12px;display:grid;grid-template-columns:1fr auto;gap:4px 20px}.t .x{font-weight:bold;font-size:15px;border-top:1px solid #222;padding-top:4px}
+  </style></head><body>
+    <div class="cab"><div><h1>${serv ? 'COMPROBANTE DE SERVICIO' : 'FACTURA DE COMPRA'}</h1><div>${esc(c.tipo)} N.º <b>${esc(c.serie)}-${esc(c.numero)}</b>${c.estado === 'ANULADO' ? ' · <b style="color:#b3261e">ANULADO</b>' : ''}</div></div><img src="${esc(new URL('logo.png', location.href).href)}" alt=""></div>
+    <div class="g"><div>Proveedor<b>${esc(c.razon)} · RUC ${esc(c.ruc || '—')}</b></div><div>Emisión<b>${fmtF(c.fechaEmision)}</b></div><div>Vencimiento<b>${fmtF(c.fechaVence) || '—'}</b></div>
+      <div>Empresa<b>${esc(c.empresa || '—')}</b></div><div>Condición / forma de pago<b>${esc(c.condicion || '—')} · ${esc(c.forma || '—')}</b></div><div>Tipo de gasto<b>${esc(c.gasto || '—')}${serv && c.centro ? ' · ' + esc(c.centro) : ''}</b></div></div>
+    <table><thead><tr><th>#</th><th>${serv ? 'Concepto' : 'Producto'}</th><th class="n">Cantidad</th><th class="n">P. unit</th><th class="n">Subtotal</th><th class="n">IGV</th><th class="n">Total</th></tr></thead><tbody>
+    ${(c.lineas || []).map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.desc)}</td><td class="n">${nq(x.cant)} ${esc(x.unidad || '')}</td><td class="n">${n2(x.vu)}</td><td class="n">${n2(x.sub)}</td><td class="n">${n2(x.igv)}</td><td class="n">${n2(x.tot)}</td></tr>`).join('')}</tbody></table>
+    <div class="t"><span>Subtotal</span><b>${m} ${n2(c.subtotal)}</b><span>IGV</span><b>${m} ${n2(c.igv)}</b>${c.detMonto ? `<span>Detracción</span><b>${m} ${n2(c.detMonto)}</b>` : ''}${c.retMonto ? `<span>Retención</span><b>${m} ${n2(c.retMonto)}</b>` : ''}<span class="x">Total</span><b class="x">${m} ${n2(c.total)}</b></div>
+    <script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+async function excelComp(c, b) {
+  ocupado(b, true, '…');
+  try {
+    const X = await libroXlsx();
+    const filas = [[`${c.tipo} ${c.serie}-${c.numero}`], [], ['Proveedor', c.razon], ['RUC', c.ruc], ['Fecha de emisión', fmtF(c.fechaEmision)], ['Vencimiento', fmtF(c.fechaVence)], ['Empresa', c.empresa], ['Condición', c.condicion], ['Forma de pago', c.forma], ['Tipo de gasto', c.gasto], ['Moneda', c.moneda], ['Estado', c.estado === 'ANULADO' ? 'ANULADO' : c.aprobacion?.estado || 'REGISTRADO'], [],
+      ['#', 'Producto / concepto', 'Código', 'Cantidad', 'Unidad', 'P. unit sin IGV', 'Subtotal', 'IGV', 'Total']];
+    (c.lineas || []).forEach((x, i) => filas.push([i + 1, x.desc, x.codigo || '', x.cant, x.unidad || '', x.vu, x.sub, x.igv, x.tot]));
+    filas.push([], ['', '', '', '', '', '', 'Subtotal', '', c.subtotal], ['', '', '', '', '', '', 'IGV', '', c.igv], ['', '', '', '', '', '', 'TOTAL', '', c.total]);
+    const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, hojaXlsx(X, filas, [18, 40, 10, 10, 10, 14, 12, 10, 12]), 'Comprobante');
+    X.writeFile(wb, `${c.tipo.toLowerCase().replace(/\s+/g, '_')}_${c.serie}-${c.numero}.xlsx`);
+  } catch (err) { toast(errorTexto(err), true); }
+  ocupado(b, false);
+}
+// Borrar un ingreso (solo ADMIN): en materiales también saca del kardex lo que ingresó y recalcula el stock
+async function borrarComp(clase, c, b) {
+  const compra = clase === 'COMPRA';
+  const pids = [...new Set((c.lineas || []).map(l => l.prodId).filter(Boolean))];
+  const negativos = compra && c.estado !== 'ANULADO' ? (c.lineas || []).filter(l => l.prodId && PRODUCTOS.get(l.prodId) && PRODUCTOS.get(l.prodId).stock + 1e-9 < l.cant).map(l => `• ${PRODUCTOS.get(l.prodId).nombre}: hay ${nq(PRODUCTOS.get(l.prodId).stock)} y la factura ingresó ${nq(l.cant)}`) : [];
+  if (!confirm(`¿Borrar ${c.tipo} ${c.serie}-${c.numero} de ${c.razon}?` + (compra ? '\n\nTambién se borrarán sus entradas del kardex y el stock se recalculará.' : '') +
+    (negativos.length ? `\n\n⚠ Parte de lo que ingresó ya se entregó; el stock quedará negativo en:\n${negativos.join('\n')}` : '') + '\n\nNo se puede deshacer.')) return;
+  ocupado(b, true, 'Borrando…');
+  try {
+    if (compra) {
+      const ms = await getDocs(query(collection(db, 'movimientos'), where('comprobanteId', '==', c.id)));
+      ms.docs.forEach(d => pids.push(d.data().productoId));
+      let lote = writeBatch(db), n = 0;
+      for (const d of ms.docs) { lote.delete(d.ref); if (++n % 450 === 0) { await lote.commit(); lote = writeBatch(db); } }
+      if (n % 450) await lote.commit();
+    }
+    await deleteDoc(doc(db, 'comprobantes', c.id));
+    if (c.adjuntoId) deleteDoc(doc(db, 'adjuntos', c.adjuntoId)).catch(() => { });
+    if (compra) for (const pid of new Set(pids)) if (pid && PRODUCTOS.has(pid)) await recalcularProducto(pid);
+    toast(`${c.tipo} ${c.serie}-${c.numero} borrada.`);
+    EST[clase].sel = null; cargarComps(clase);
+  } catch (err) { toast(errorTexto(err), true); ocupado(b, false); }
 }
 function exportarComps(clase) {
   const l = filtrarComps(clase), filas = [['Fecha emisión', 'Tipo', 'Serie', 'Número', 'RUC', 'Proveedor', 'Empresa', 'Condición', 'Vencimiento', 'Forma de pago', 'Tipo de gasto', 'Centro de costos', 'Destino', 'Moneda', 'Ítem', 'Producto / concepto', 'Código', 'Unidad', 'Cantidad', 'P. unit sin IGV', 'Subtotal', 'IGV', 'Total ítem', 'Total comprobante', 'Detracción', 'Retención IR', 'Total a pagar', 'Aprobación', 'Estado', 'Registró', 'N.º solicitud', 'Anotaciones']];
@@ -1395,13 +1510,13 @@ function abrirSolicitudes() {
 async function cargarSolicitudes() {
   const est = $('solEstado').value; let mes = $('solMes').value;
   if (!est && !mes) { mes = mesISO(); $('solMes').value = mes; }
-  $('solFilas').innerHTML = '<tr><td colspan="8" class="vacio">Cargando…</td></tr>';
+  $('solFilas').innerHTML = '<div class="vacio">Cargando…</div>';
   try {
     const q = est ? query(collection(db, 'solicitudes'), where('estado', '==', est)) : query(collection(db, 'solicitudes'), where('mes', '==', mes));
     const s = await getDocs(q);
     SOLS.lista = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => !mes || x.mes === mes).sort((a, b) => (b.numero || 0) - (a.numero || 0));
     pintarSolicitudes();
-  } catch (e) { $('solFilas').innerHTML = `<tr><td colspan="8"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
+  } catch (e) { $('solFilas').innerHTML = `<div class="aviso error">${esc(errorTexto(e))}</div>`; }
 }
 const estSol = e => e === 'ATENDIDA' ? 'ENTREGADA' : e;
 function filtrarSolicitudes() {
@@ -1409,14 +1524,45 @@ function filtrarSolicitudes() {
   const t = $('solTipo').value;
   return SOLS.lista.filter(x => (!t || (x.tipo || 'ESCRITORIO') === t) && (!q || norm([x.numero, x.centroNombre, x.solicitante, ...(x.items || []).map(i => i.desc)].join(' ')).includes(q)));
 }
+const pillSol = x => `<span class="pill ${x.estado === 'ATENDIDA' ? 'APROBADO' : x.estado === 'RECHAZADA' ? 'RECHAZADO' : 'PENDIENTE'}">${esc(estSol(x.estado))}</span>`;
 function pintarSolicitudes() {
-  const l = filtrarSolicitudes(), op = puede('kardex');
+  const l = filtrarSolicitudes();
   $('solRes').innerHTML = `<span><b>${l.length}</b> solicitudes</span><span>Pendientes: <b>${l.filter(x => x.estado === 'PENDIENTE').length}</b></span>`;
-  $('solFilas').innerHTML = l.length ? l.map(x => `<tr><td><b>${x.numero}</b></td><td>${fmtF(x.fecha)}</td><td><span class="pill ${x.tipo === 'LIMPIEZA' ? 'AJUSTE' : 'ENTRADA'}">${tipoSolTxt(x)}</span></td><td>${esc(x.centroNombre || x.centro)}</td><td>${esc(x.solicitante)}</td>
-      <td>${(x.items || []).length} material(es)<br><small class="nota">${esc((x.items || []).slice(0, 3).map(i => `${i.desc} (${nq(i.cant)})`).join(', '))}${(x.items || []).length > 3 ? '…' : ''}</small>${x.nota ? `<br><small class="nota">“${esc(x.nota)}”</small>` : ''}</td>
-      <td><span class="pill ${x.estado === 'ATENDIDA' ? 'APROBADO' : x.estado === 'RECHAZADA' ? 'RECHAZADO' : 'PENDIENTE'}">${esc(estSol(x.estado))}</span>${x.fechaEntrega ? `<br><small class="nota">${fmtF(x.fechaEntrega)}</small>` : ''}</td>
-      <td><div class="acciones">${x.estado === 'PENDIENTE' && op ? `<button class="btn chico" data-sol="${esc(x.id)}">Atender</button>` : `<button class="btn sec chico" data-sol="${esc(x.id)}">Ver</button>`}<button class="btn sec chico" data-solxls="${esc(x.id)}" title="Descargar esta solicitud en Excel">Excel</button>${YO.rol === 'ADMIN' && x.estado !== 'PENDIENTE' ? `<button class="btn sec chico" data-solrev="${esc(x.id)}" title="Deshace la entrega o el rechazo y la deja pendiente otra vez">Volver a pendiente</button>` : ''}${YO.rol === 'ADMIN' ? `<button class="btn peligro chico" data-soldel="${esc(x.id)}" title="Borrar esta solicitud">Borrar</button>` : ''}</div></td></tr>`).join('')
-    : '<tr><td colspan="8" class="vacio">No hay solicitudes con este filtro.</td></tr>';
+  if (!l.some(x => x.id === SOLS.sel)) SOLS.sel = l[0]?.id || null;
+  $('solFilas').innerHTML = l.length ? l.map(x => `<button type="button" class="md-item${x.id === SOLS.sel ? ' act' : ''}" data-solsel="${esc(x.id)}">
+      <div class="l1"><b>${esc(x.centroNombre || x.centro)}</b>${pillSol(x)}</div>
+      <div class="l2"><span>N.º ${x.numero} · ${tipoSolTxt(x) === 'LIMPIEZA' ? '🧽 Limpieza' : '✏️ Escritorio'} <span class="gris">· ${fmtF(x.fecha)}</span></span><span class="gris">${(x.items || []).length} material(es)</span></div>
+      <div class="l3"><span>${esc(x.solicitante)}</span>${x.fechaEntrega ? `<span>Entregado ${fmtF(x.fechaEntrega)}</span>` : ''}</div></button>`).join('')
+    : '<div class="vacio">No hay solicitudes con este filtro.</div>';
+  pintarDetSolicitud();
+}
+// Documento de la solicitud elegida, con su barra de acciones
+function pintarDetSolicitud() {
+  const x = SOLS.lista.find(y => y.id === SOLS.sel);
+  if (!x) { $('solDet').innerHTML = '<div class="vacio">Elige una solicitud de la lista para verla.</div>'; return; }
+  const id = esc(x.id), entregada = !!x.entrega, op = puede('kardex'), adm = YO.rol === 'ADMIN', par = parejaDe(x);
+  const acc = [];
+  if (x.estado === 'PENDIENTE' && op) acc.push(botonIco('camion', par ? 'Atender (con N.º ' + par.numero + ')' : 'Atender', `data-sol="${id}"`, 'prim'));
+  else acc.push(botonIco('editar', 'Abrir', `data-sol="${id}"`));
+  acc.push(botonIco('imprimir', 'Imprimir', `data-solimp="${id}"`), botonIco('excel', 'Excel', `data-solxls="${id}"`));
+  if (adm && x.estado !== 'PENDIENTE') acc.push(botonIco('deshacer', 'Volver a pendiente', `data-solrev="${id}"`));
+  if (adm) acc.push(botonIco('borrar', 'Borrar', `data-soldel="${id}"`, 'peligro'));
+  const est = x.estado === 'ATENDIDA' ? '<span class="estado ok">ENTREGADA</span>' : x.estado === 'RECHAZADA' ? '<span class="estado no">RECHAZADA</span>' : '<span class="estado am">PENDIENTE</span>';
+  const datos = [['Sucursal / centro de costo', esc(x.centroNombre || x.centro)], ['Solicitado por', esc(x.solicitante)], ['Fecha de solicitud', fmtF(x.fecha)],
+    ...(entregada ? [['Fecha de entrega', fmtF(x.fechaEntrega)], ['Entregado por', esc(x.entregadoPor || '—')], ['Recibido por', esc(x.recibidoPor || '—')]] : [])];
+  const filas = entregada
+    ? x.entrega.map((i, k) => { const no = !(i.cant > 0); return `<tr class="${no ? 'sol-no' : i.cantSol && i.cant < i.cantSol ? 'sol-parcial' : ''}"><td>${k + 1}</td><td>${esc(i.producto || i.desc)}${i.producto && i.producto !== i.desc ? `<br><small class="nota">Pidió: ${esc(i.desc)}</small>` : ''}</td><td class="num">${nq(i.cantSol)}</td><td class="num"><b>${no ? '—' : nq(i.cant)}</b> ${esc(i.unidad || '')}</td><td>${no ? '<span class="obs-txt">NO ATENDIDO</span> ' : ''}${i.obs ? `<span class="obs-txt">${esc(i.obs)}</span>` : ''}</td><td class="num">${no ? '' : n2(i.cu)}</td><td class="num">${no ? '' : n2(i.ct)}</td></tr>`; }).join('')
+    : (x.items || []).map((i, k) => { const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.desc); const falta = p && p.stock + 1e-9 < i.cant; return `<tr><td>${k + 1}</td><td>${esc(i.desc)}${p ? `<br><small class="nota">${esc(p.codigo)}</small>` : '<br><small class="nota">No está en el kardex</small>'}</td><td class="num"><b>${nq(i.cant)}</b> ${esc(i.unidad || '')}</td><td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td></tr>`; }).join('');
+  $('solDet').innerHTML = `<div class="tb"><span class="tit">Solicitud N.º ${x.numero}</span>${acc.join('')}</div>
+    <div class="doc">
+      <div class="doc-cab"><div><h3>${tipoSolTxt(x) === 'LIMPIEZA' ? '🧽 MATERIALES DE LIMPIEZA' : '✏️ ÚTILES DE ESCRITORIO'}</h3><div class="sub">Solicitud N.º <b>${x.numero}</b> · ${esc(x.centroNombre || x.centro)}</div>${est}</div>
+        ${entregada ? `<div style="text-align:right"><div class="nota">Costo de lo entregado</div><div style="font-size:24px;font-weight:bold">S/ ${n2(x.totalCosto)}</div></div>` : `<div style="text-align:right"><div class="nota">Materiales</div><div style="font-size:24px;font-weight:bold">${(x.items || []).length}</div></div>`}</div>
+      ${par ? `<div class="aviso-par">Este pedido va junto con la <button type="button" data-solsel="${esc(par.id)}">Solicitud N.º ${par.numero} (${tipoSolTxt(par) === 'LIMPIEZA' ? 'limpieza' : 'escritorio'})</button>${x.estado === 'PENDIENTE' ? '. Al atender se abren las dos juntas.' : '.'}</div>` : ''}
+      <div class="doc-datos">${datos.map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('')}</div>
+      ${x.nota ? `<div class="aviso">Comentario de la sucursal: “${esc(x.nota)}”</div>` : ''}${x.motivo ? `<div class="aviso error">Motivo del rechazo: ${esc(x.motivo)}</div>` : ''}
+      <div class="tabla"><table><thead><tr>${entregada ? '<th>#</th><th>Material</th><th class="num">Pidió</th><th class="num">Entregado</th><th>Observación</th><th class="num">C. unit.</th><th class="num">C. total</th>' : '<th>#</th><th>Material</th><th class="num">Pidió</th><th class="num">Stock actual</th>'}</tr></thead><tbody>${filas || '<tr><td colspan="7" class="vacio">Sin materiales.</td></tr>'}</tbody></table></div>
+      ${entregada ? `<div class="tots"><span class="g">Total</span><b class="g">S/ ${n2(x.totalCosto)}</b></div>` : ''}
+    </div>`;
 }
 $('solEstado').addEventListener('change', () => { if ($('solEstado').value === 'PENDIENTE') $('solMes').value = ''; cargarSolicitudes(); });
 $('solMes').addEventListener('change', cargarSolicitudes);
@@ -1428,9 +1574,12 @@ $('solCsv').addEventListener('click', () => {
   filtrarSolicitudes().forEach(x => (x.entrega || x.items || []).forEach(i => f.push([x.numero, tipoSolTxt(x), fmtF(x.fecha), x.centroNombre || x.centro, x.solicitante, estSol(x.estado), fmtF(x.fechaEntrega), i.desc, String(i.cantSol ?? i.cant).replace('.', ','), i.codigo || '', i.producto || '', x.entrega ? String(i.cant).replace('.', ',') : '', x.entrega ? numCSV(i.cu) : '', x.entrega ? numCSV(i.ct) : '', i.obs || (x.entrega && !(i.cant > 0) ? 'NO ATENDIDO' : ''), x.recibidoPor || '', x.entregadoPor || ''])));
   descargarCSV(`solicitudes_${$('solMes').value || 'pendientes'}.csv`, f);
 });
-$('solFilas').addEventListener('click', async e => {
+$('solMD').addEventListener('click', async e => {
   const a = e.target.closest('[data-sol]'), xl = e.target.closest('[data-solxls]'), del = e.target.closest('[data-soldel]'), rev = e.target.closest('[data-solrev]');
   if (rev) { const x = SOLS.lista.find(y => y.id === rev.dataset.solrev); if (x) volverAPendiente(x, rev); return; }
+  const sel = e.target.closest('[data-solsel]'), imp = e.target.closest('[data-solimp]');
+  if (sel) { SOLS.sel = sel.dataset.solsel; $('solFilas').querySelectorAll('.md-item').forEach(y => y.classList.toggle('act', y.dataset.solsel === SOLS.sel)); pintarDetSolicitud(); return; }
+  if (imp) { const x = SOLS.lista.find(y => y.id === imp.dataset.solimp), par = x && parejaDe(x); if (x) { if (par) imprimirSucursalUnaHoja(x.centroNombre || x.centro, [x, par]); else imprimirSolicitud(x); } return; }
   if (a) abrirSolicitud(SOLS.lista.find(x => x.id === a.dataset.sol));
   if (xl) { const x = SOLS.lista.find(y => y.id === xl.dataset.solxls); if (x) excelSolicitud(x, xl); }
   if (del) {
