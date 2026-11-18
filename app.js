@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.18a'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.18b'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -1650,14 +1650,14 @@ function htmlMedia(tipo, l, nombreSuc) {
   return `<section class="media">
     <div class="cab"><h1>${tit}</h1><img src="${esc(new URL('logo.png', location.href).href)}" alt=""></div>
     <div class="datos">
-      <div>Fecha de solicitud <b>${unicos(l.map(x => fmtF(x.fecha))).join(', ')}</b></div><div>N.º correlativo <b>${l.map(x => x.numero).join(', ')}</b></div>
+      <div>Fecha de solicitud <b>${unicos(l.map(x => fmtF(x.fecha))).join(', ')}</b></div><div>N.º correlativo <b>${unicos(l.flatMap(x => String(x.numero).split(', ')).filter(n => n !== '—')).join(', ') || '—'}</b></div>
       <div>Fecha de entrega <b>${unicos(l.map(x => fmtF(x.fechaEntrega))).join(', ') || '&nbsp;'}</b></div><div>Centro de costo <b>${esc(nombreSuc)}</b></div>
     </div>
     <div class="una">${tabla(filas)}</div>
     <div class="dos" hidden><div>${tabla(filas.slice(0, mitad))}</div><div>${tabla(filas.slice(mitad))}</div></div>
     ${conCosto ? `<p class="tot">TOTAL S/ ${n2(tot)}</p>` : ''}
-    <p class="nota">Solicitado por: ${esc(unicos(l.map(x => x.solicitante)).join(', '))}${unicos(l.map(x => x.nota)).length ? ' · ' + esc(unicos(l.map(x => x.nota)).join(' · ')) : ''}</p>
-    <div class="firmas"><div>Entregado por: ${esc(unicos(l.map(x => x.entregadoPor)).join(', '))}</div><div>Recibido por: ${esc(unicos(l.map(x => x.recibidoPor)).join(', '))}</div></div>
+    <p class="nota">Solicitado por: ${esc(unicos(l.flatMap(x => String(x.solicitante || '').split(', '))).join(', '))}${unicos(l.map(x => x.nota)).length ? ' · ' + esc(unicos(l.map(x => x.nota)).join(' · ')) : ''}</p>
+    <div class="firmas"><div>Entregado por: ${esc(unicos(l.flatMap(x => String(x.entregadoPor || '').split(', '))).join(', '))}</div><div>Recibido por: ${esc(unicos(l.flatMap(x => String(x.recibidoPor || '').split(', '))).join(', '))}</div></div>
   </section>`;
 }
 function imprimirSucursalUnaHoja(nombreSuc, l) {
@@ -1702,6 +1702,10 @@ const SAL = { lista: [] };
 function abrirSalidas() {
   $('sNueva').hidden = !puede('kardex');
   if (!$('sMes').value) $('sMes').value = mesISO();
+  const ant = $('sSuc').value;
+  $('sSuc').innerHTML = '<option value="">— Elegir sucursal —</option>' + (LISTAS.codigosCC || []).map(c => `<option value="${esc(c.codigo)}">${esc(c.codigo + (c.nombre ? ' · ' + c.nombre : ''))}</option>`).join('');
+  if (ant) $('sSuc').value = ant;
+  if (!$('sDia').value) $('sDia').value = hoyISO();
   cargarSalidas();
 }
 async function cargarSalidas() {
@@ -1729,6 +1733,37 @@ function pintarSalidas() {
     : '<tr><td colspan="10" class="vacio">No hay salidas con este filtro.</td></tr>';
 }
 $('sMes').addEventListener('change', cargarSalidas);
+// Imprimir lo entregado a una sucursal en una sola hoja (escritorio arriba, limpieza abajo)
+$('sDia').addEventListener('change', () => { const d = $('sDia').value; if (d && d.slice(0, 7) !== $('sMes').value) { $('sMes').value = d.slice(0, 7); cargarSalidas(); } });
+$('sImpSuc').addEventListener('click', async e => {
+  const c = $('sSuc').value, dia = $('sDia').value; if (!c) return toast('Elige la sucursal que quieres imprimir.', true);
+  const nom = $('sSuc').selectedOptions[0].textContent;
+  const movs = SAL.lista.filter(m => m.tipo === 'SALIDA' && String(m.tercero) === c && (!dia || m.fecha === dia));
+  if (!movs.length) return toast(`No hay salidas para ${nom} ${dia ? 'el ' + fmtF(dia) : 'en el mes elegido'}.`, true);
+  const b = e.currentTarget; ocupado(b, true, 'Preparando…');
+  try {
+    // datos de las solicitudes de origen (N.º y fecha de solicitud), si las salidas vinieron de una
+    const sols = new Map();
+    for (const id of new Set(movs.map(m => m.solicitudId).filter(Boolean))) { try { const d = await getDoc(doc(db, 'solicitudes', id)); if (d.exists()) sols.set(id, d.data()); } catch (err) { } }
+    const tipoDe = m => { const s0 = m.solicitudId && sols.get(m.solicitudId); if (s0) return s0.tipo === 'LIMPIEZA' ? 'LIMPIEZA' : 'ESCRITORIO'; return /LIMPIEZA/i.test(PRODUCTOS.get(m.productoId)?.categoria || '') ? 'LIMPIEZA' : 'ESCRITORIO'; };
+    const unicos = v => [...new Set(v.filter(Boolean))];
+    const grupo = tipo => {
+      const ms = movs.filter(m => tipoDe(m) === tipo).sort((a, b2) => (a.fecha || '').localeCompare(b2.fecha || '') || (a.ms || 0) - (b2.ms || 0)); if (!ms.length) return [];
+      // una entrada por día de entrega; la hoja junta los días y los N.º de solicitud sin repetirlos
+      return unicos(ms.map(m => m.fecha)).map(f => {
+        const md = ms.filter(m => m.fecha === f), ss = unicos(md.map(m => m.solicitudId)).map(id => sols.get(id)).filter(Boolean);
+        return {
+          tipo, numero: ss.length ? ss.map(x => x.numero).join(', ') : '—', fecha: ss.length ? ss.map(x => x.fecha).sort()[0] : '', fechaEntrega: f,
+          solicitante: unicos(ss.map(x => x.solicitante)).join(', '), nota: '',
+          entregadoPor: unicos(ss.map(x => x.entregadoPor)).join(', ') || unicos(md.map(m => m.usuario)).join(', '), recibidoPor: unicos(md.map(m => m.persona)).join(', '),
+          entrega: md.map(m => ({ codigo: m.codigo, cant: m.cant, unidad: m.unidad, producto: m.producto, desc: m.producto, cu: m.cu || 0, ct: m.ct || 0 }))
+        };
+      });
+    };
+    imprimirSucursalUnaHoja(nom, [...grupo('ESCRITORIO'), ...grupo('LIMPIEZA')]);
+  } catch (err) { toast(errorTexto(err), true); }
+  ocupado(b, false);
+});
 ['sTipo', 'sBuscar'].forEach(i => $(i).addEventListener('input', pintarSalidas));
 $('sCsv').addEventListener('click', () => descargarCSV(`salidas_${$('sMes').value}.csv`, filasKardex(filtrarSalidas())));
 $('sFilas').addEventListener('click', async e => {
