@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.18b'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.18c'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -1425,8 +1425,8 @@ $('solBuscar').addEventListener('input', pintarSolicitudes);
 $('solTipo').addEventListener('change', pintarSolicitudes);
 const tipoSolTxt = x => x.tipo === 'LIMPIEZA' ? 'LIMPIEZA' : 'ESCRITORIO';
 $('solCsv').addEventListener('click', () => {
-  const f = [['N.º', 'Tipo', 'Fecha solicitud', 'Sucursal', 'Solicitado por', 'Estado', 'Fecha entrega', 'Material pedido', 'Cant. pedida', 'Código', 'Material entregado', 'Cant. entregada', 'Costo unit.', 'Costo total', 'Recibido por', 'Entregado por']];
-  filtrarSolicitudes().forEach(x => (x.entrega || x.items || []).forEach(i => f.push([x.numero, tipoSolTxt(x), fmtF(x.fecha), x.centroNombre || x.centro, x.solicitante, estSol(x.estado), fmtF(x.fechaEntrega), i.desc, String(i.cantSol ?? i.cant).replace('.', ','), i.codigo || '', i.producto || '', x.entrega ? String(i.cant).replace('.', ',') : '', x.entrega ? numCSV(i.cu) : '', x.entrega ? numCSV(i.ct) : '', x.recibidoPor || '', x.entregadoPor || ''])));
+  const f = [['N.º', 'Tipo', 'Fecha solicitud', 'Sucursal', 'Solicitado por', 'Estado', 'Fecha entrega', 'Material pedido', 'Cant. pedida', 'Código', 'Material entregado', 'Cant. entregada', 'Costo unit.', 'Costo total', 'Observación', 'Recibido por', 'Entregado por']];
+  filtrarSolicitudes().forEach(x => (x.entrega || x.items || []).forEach(i => f.push([x.numero, tipoSolTxt(x), fmtF(x.fecha), x.centroNombre || x.centro, x.solicitante, estSol(x.estado), fmtF(x.fechaEntrega), i.desc, String(i.cantSol ?? i.cant).replace('.', ','), i.codigo || '', i.producto || '', x.entrega ? String(i.cant).replace('.', ',') : '', x.entrega ? numCSV(i.cu) : '', x.entrega ? numCSV(i.ct) : '', i.obs || (x.entrega && !(i.cant > 0) ? 'NO ATENDIDO' : ''), x.recibidoPor || '', x.entregadoPor || ''])));
   descargarCSV(`solicitudes_${$('solMes').value || 'pendientes'}.csv`, f);
 });
 $('solFilas').addEventListener('click', async e => {
@@ -1456,13 +1456,13 @@ async function excelSolicitud(x, b) {
       ['N.º correlativo', x.numero], ['Fecha de solicitud', fmtF(x.fecha)], ['Sucursal / centro de costo', sucTxt(x)], ['Solicitado por', x.solicitante], ['Estado', estSol(x.estado)],
       ...(entregada ? [['Fecha de entrega', fmtF(x.fechaEntrega)], ['Entregado por', x.entregadoPor || ''], ['Recibido por', x.recibidoPor || '']] : []),
       ...(x.nota ? [['Comentario', x.nota]] : []), [],
-      entregada ? ['#', 'Material pedido', 'Cant. pedida', 'Código', 'Material entregado', 'Cant. entregada', 'Unidad', 'Costo unit.', 'Costo total'] : ['#', 'Material', 'Cantidad', 'Unidad', 'Código', 'Stock actual']];
+      entregada ? ['#', 'Material pedido', 'Cant. pedida', 'Código', 'Material entregado', 'Cant. entregada', 'Unidad', 'Costo unit.', 'Costo total', 'Estado', 'Observación'] : ['#', 'Material', 'Cantidad', 'Unidad', 'Código', 'Stock actual']];
     (x.entrega || x.items || []).forEach((i, k) => filas.push(entregada
-      ? [k + 1, i.desc, i.cantSol ?? '', i.codigo || '', i.producto || '', i.cant, i.unidad || '', r2(i.cu || 0), r2(i.ct || 0)]
+      ? [k + 1, i.desc, i.cantSol ?? '', i.codigo || '', i.producto || '', i.cant, i.unidad || '', r2(i.cu || 0), r2(i.ct || 0), !(i.cant > 0) ? 'NO ATENDIDO' : i.cantSol && i.cant < i.cantSol ? 'PARCIAL' : 'ENTREGADO', i.obs || '']
       : [k + 1, i.desc, i.cant, i.unidad || '', i.codigo || '', i.prodId && PRODUCTOS.get(i.prodId) ? PRODUCTOS.get(i.prodId).stock : '']));
     if (entregada) filas.push([], ['', '', '', '', '', '', '', 'TOTAL S/', r2(x.totalCosto || 0)]);
     const wb = X.utils.book_new();
-    X.utils.book_append_sheet(wb, hojaXlsx(X, filas, [24, 34, 12, 10, 32, 14, 10, 12, 12]), `Solicitud ${x.numero}`);
+    X.utils.book_append_sheet(wb, hojaXlsx(X, filas, [24, 34, 12, 10, 32, 14, 10, 12, 12, 14, 40]), `Solicitud ${x.numero}`);
     X.writeFile(wb, `solicitud_${x.numero}_${tipoSolTxt(x).toLowerCase()}_${String(x.centro).replace(/\W+/g, '')}.xlsx`);
   } catch (err) { toast(errorTexto(err), true); }
   ocupado(b, false);
@@ -1517,7 +1517,7 @@ function abrirSolicitud(x) {
   const editable = x.estado === 'PENDIENTE' && puede('kardex');
   SOL = { x, editable, lineas: (x.entrega || x.items || []).map(i => {
     const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.producto || i.desc);
-    return { desc: i.desc, cantSol: i.cantSol ?? i.cant, unidadSol: i.unidad || '', prodId: p?.id || null, entregar: x.entrega ? i.cant : (i.cant || 0), cu: i.cu };
+    return { desc: i.desc, cantSol: i.cantSol ?? i.cant, unidadSol: i.unidad || '', prodId: p?.id || null, entregar: x.entrega ? i.cant : (i.cant || 0), cu: i.cu, obs: i.obs || '' };
   }) };
   $('solTit').textContent = `Solicitud N.º ${x.numero} · ${tipoSolTxt(x) === 'LIMPIEZA' ? 'Limpieza' : 'Escritorio'} · ${x.centroNombre || x.centro}`;
   $('solInfo').innerHTML = `Solicitado por <b>${esc(x.solicitante)}</b> el ${fmtF(x.fecha)} · Estado: <b>${esc(estSol(x.estado))}</b>${x.nota ? ` · Comentario: “${esc(x.nota)}”` : ''}${x.motivo ? ` · Motivo: ${esc(x.motivo)}` : ''}${x.atendidoPor ? ` · Registró: ${esc(x.atendidoPor)}` : ''}`;
@@ -1534,10 +1534,13 @@ function pintarLineasSol() {
   $('solItems').innerHTML = SOL.lineas.map((l, i) => {
     const p = l.prodId ? PRODUCTOS.get(l.prodId) : null, cu = SOL.editable ? (p?.cProm || 0) : (l.cu || 0), ct = r2(cu * (Number(l.entregar) || 0)); tot += ct;
     const falta = SOL.editable && p && Number(l.entregar) > p.stock + 1e-9;
-    return `<tr data-i="${i}"><td class="c">${i + 1}</td><td>${esc(l.desc)}</td><td class="num">${nq(l.cantSol)} <small class="nota">${esc(l.unidadSol)}</small></td>
+    const no = !(Number(l.entregar) > 0), parcial = !no && Number(l.entregar) < Number(l.cantSol);
+    return `<tr data-i="${i}" class="${no ? 'sol-no' : parcial ? 'sol-parcial' : ''}"><td class="c">${i + 1}</td><td>${esc(l.desc)}</td><td class="num">${nq(l.cantSol)} <small class="nota">${esc(l.unidadSol)}</small></td>
       <td><input data-f="prod" list="dlProd" value="${p ? esc(etiquetaProd(p)) : ''}" placeholder="Elegir material del kardex"${dis} aria-label="Material del kardex para la línea ${i + 1}" style="min-width:240px"></td>
       <td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td>
       <td class="num"><input class="w6 num" type="number" min="0" step="any" data-f="cant" value="${l.entregar}"${dis} aria-label="Cantidad a entregar en la línea ${i + 1}"></td>
+      <td>${SOL.editable ? `<input data-f="obs" list="dlObs" maxlength="120" value="${esc(l.obs || '')}" class="${no && !limpio(l.obs) ? 'obs-req' : ''}" placeholder="${no ? '¿Por qué no se entrega?' : parcial ? '¿Por qué se entrega menos?' : 'Opcional'}" aria-label="Observación de la línea ${i + 1}" style="min-width:190px">`
+        : (l.obs ? `<span class="obs-txt">${esc(l.obs)}</span>` : (no ? '<span class="obs-txt">No atendido</span>' : ''))}</td>
       <td class="num">${n2(cu)}</td><td class="num">${n2(ct)}</td></tr>`;
   }).join('');
   $('solTotal').textContent = n2(tot);
@@ -1546,9 +1549,16 @@ $('solItems').addEventListener('change', e => {
   const tr = e.target.closest('tr[data-i]'); if (!tr || !SOL?.editable) return;
   const l = SOL.lineas[+tr.dataset.i];
   if (e.target.dataset.f === 'prod') { const p = buscarProd(e.target.value); l.prodId = p?.id || null; if (e.target.value && !p) toast('Elige un material de la lista del kardex.', true); }
-  if (e.target.dataset.f === 'cant') l.entregar = r4(Math.max(0, num(e.target.value)));
+  if (e.target.dataset.f === 'obs') { l.obs = limpio(e.target.value).toUpperCase(); e.target.value = l.obs; e.target.classList.toggle('obs-req', !(Number(l.entregar) > 0) && !l.obs); return; }
+  if (e.target.dataset.f === 'cant') {
+    l.entregar = r4(Math.max(0, num(e.target.value)));
+    const p = l.prodId ? PRODUCTOS.get(l.prodId) : null;
+    if (!(l.entregar > 0) && !l.obs && (!p || !(p.stock > 0))) l.obs = 'SIN STOCK'; // sugerencia automática
+  }
   pintarLineasSol();
+  if (e.target.dataset.f === 'cant') { const o = $('solItems').querySelector(`tr[data-i="${tr.dataset.i}"] [data-f="obs"]`); if (o && !(l.entregar > 0) && !l.obs) o.focus(); }
 });
+$('solItems').addEventListener('input', e => { if (e.target.dataset.f === 'obs' && SOL?.editable) { const l = SOL.lineas[+e.target.closest('tr').dataset.i]; l.obs = limpio(e.target.value).toUpperCase(); } });
 $('solCerrar').addEventListener('click', () => $('dSol').close());
 $('solImprimir').addEventListener('click', () => { if (SOL) imprimirSolicitud(SOL.x, SOL.editable ? SOL : null); });
 $('solRechazar').addEventListener('click', async e => {
@@ -1567,6 +1577,8 @@ $('fSolAt').addEventListener('submit', async e => {
   const lineas = SOL.lineas.map(l => ({ ...l, entregar: r4(Number(l.entregar) || 0) }));
   if (lineas.some(l => l.entregar > 0 && !l.prodId)) return msg('Hay materiales a entregar sin elegir su material del kardex (o pon 0 si no se entrega).');
   if (!lineas.some(l => l.entregar > 0)) return msg('No hay nada para entregar. Si no se atenderá, usa “Rechazar”.');
+  const sinObs = lineas.map((l, i) => !(l.entregar > 0) && !limpio(l.obs) ? i + 1 : 0).filter(Boolean);
+  if (sinObs.length) { pintarLineasSol(); return msg(`Escribe la observación de lo que no se entrega (línea${sinObs.length > 1 ? 's' : ''} ${sinObs.join(', ')}). Por ejemplo: SIN STOCK.`); }
   const b = $('solEntregar'); ocupado(b, true, 'Registrando…'); msg('');
   try {
     await runTransaction(db, async tx => {
@@ -1576,17 +1588,18 @@ $('fSolAt').addEventListener('submit', async e => {
       for (const pid of new Set(lineas.filter(l => l.entregar > 0).map(l => l.prodId))) { const ps = await tx.get(doc(db, 'productos', pid)); if (!ps.exists()) throw new Error('Un material ya no existe en el kardex.'); est.set(pid, ps.data()); }
       let ms = Date.now(), total = 0;
       const detalle = lineas.map(l => {
-        if (!(l.entregar > 0)) return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: '', producto: '', unidad: l.unidadSol, cant: 0, cu: 0, ct: 0 };
+        const obs = limpio(l.obs).toUpperCase();
+        if (!(l.entregar > 0)) return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: '', producto: '', unidad: l.unidadSol, cant: 0, cu: 0, ct: 0, obs };
         const p = est.get(l.prodId);
         if (l.entregar > p.stock + 1e-9) throw new Error(`Stock insuficiente de ${p.nombre}: hay ${nq(p.stock)} ${p.unidad}.`);
         const cu = p.cProm || 0, ct = r2(l.entregar * cu);
         p.stock = r4(p.stock - l.entregar); p.valor = p.stock <= 1e-9 ? 0 : r2(p.valor - ct); p.cProm = p.stock > 0 ? r4(p.valor / p.stock) : 0; total += ct;
         tx.set(doc(collection(db, 'movimientos')), {
           productoId: l.prodId, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, fecha, ms: ms++, tipo: 'SALIDA', origen: 'CONSUMO',
-          documento: `Solicitud N.º ${x.numero}`, solicitudId: x.id, tercero: x.centro, persona: recibe,
+          documento: `Solicitud N.º ${x.numero}`, solicitudId: x.id, tercero: x.centro, persona: recibe, ...(obs ? { obs } : {}), cantSol: l.cantSol,
           cant: l.entregar, cu, ct, saldoCant: p.stock, cProm: p.cProm, saldoValor: p.valor, usuario: YO.nombre, uid: YO.uid, creado: serverTimestamp()
         });
-        return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, cant: l.entregar, cu, ct };
+        return { desc: l.desc, cantSol: l.cantSol, prodId: l.prodId, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, cant: l.entregar, cu, ct, obs };
       });
       for (const [pid, p] of est) tx.update(doc(db, 'productos', pid), { stock: p.stock, valor: p.valor, cProm: p.cProm, actMs: Date.now(), ultMov: fecha });
       tx.update(ref, { estado: 'ATENDIDA', fechaEntrega: fecha, entregadoPor: entrega, recibidoPor: recibe, entrega: detalle, totalCosto: r2(total), atendidoPor: YO.nombre, atendidoMs: Date.now() });
@@ -1598,8 +1611,8 @@ $('fSolAt').addEventListener('submit', async e => {
 
 // Formato impreso como el de papel: "Formato de consumo de materiales de escritorio"
 function htmlFormato(x, borrador) {
-  const filas = borrador ? borrador.lineas.map(l => { const p = l.prodId ? PRODUCTOS.get(l.prodId) : null, cu = p?.cProm || 0; return { codigo: p?.codigo || '', cant: l.entregar, unidad: p?.unidad || l.unidadSol, desc: p?.nombre || l.desc, cu, ct: r2(cu * l.entregar) }; })
-    : x.entrega ? x.entrega.map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.producto || i.desc, cu: i.cu, ct: i.ct, pedido: i.desc, cantSol: i.cantSol }))
+  const filas = borrador ? borrador.lineas.map(l => { const p = l.prodId ? PRODUCTOS.get(l.prodId) : null, cu = p?.cProm || 0; return { codigo: p?.codigo || '', cant: l.entregar, unidad: p?.unidad || l.unidadSol, desc: p?.nombre || l.desc, cu, ct: r2(cu * l.entregar), obs: l.obs, pedido: l.desc, cantSol: l.cantSol }; })
+    : x.entrega ? x.entrega.map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.producto || i.desc, cu: i.cu, ct: i.ct, pedido: i.desc, cantSol: i.cantSol, obs: i.obs }))
       : (x.items || []).map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.desc, cu: null, ct: null }));
   const tot = filas.reduce((a, f) => a + (f.ct || 0), 0);
   return `<section class="hoja">
@@ -1609,7 +1622,7 @@ function htmlFormato(x, borrador) {
       <div>Fecha de entrega <b>${fmtF(borrador ? $('solFEnt').value : x.fechaEntrega) || '&nbsp;'}</b></div><div>Centro de costo <b>${esc(x.centroNombre || x.centro)}</b></div>
     </div>
     <table><thead><tr><th>Código</th><th>Cantidad</th><th>Descripción</th><th>Costo unitario</th><th>Costo total</th></tr></thead><tbody>
-    ${filas.map(f => `<tr><td>${esc(f.codigo || '')}</td><td>${f.cant ? nq(f.cant) + ' ' + esc(f.unidad || '') : (x.entrega ? '<span class="nota">no entregado</span>' : '')}</td><td>${esc(f.desc)}${f.pedido && f.pedido !== f.desc ? `<br><span class="nota">Pidió: ${esc(f.pedido)} (${nq(f.cantSol)})</span>` : ''}</td><td class="n">${f.cu === null ? '' : n2(f.cu)}</td><td class="n">${f.ct === null ? '' : n2(f.ct)}</td></tr>`).join('')}
+    ${filas.map(f => `<tr><td>${esc(f.codigo || '')}</td><td>${f.cant ? nq(f.cant) + ' ' + esc(f.unidad || '') : (x.entrega || borrador ? '<b class="noat">NO ATENDIDO</b>' : '')}</td><td>${esc(f.desc)}${f.pedido && f.pedido !== f.desc ? `<br><span class="nota">Pidió: ${esc(f.pedido)} (${nq(f.cantSol)})</span>` : ''}${(x.entrega || borrador) && f.cant && f.cantSol && f.cant < f.cantSol ? `<br><span class="nota">Pidió ${nq(f.cantSol)}; se entregó ${nq(f.cant)}</span>` : ''}${f.obs ? `<br><span class="obs">Obs.: ${esc(f.obs)}</span>` : ''}</td><td class="n">${f.cu === null ? '' : n2(f.cu)}</td><td class="n">${f.ct === null ? '' : n2(f.ct)}</td></tr>`).join('')}
     ${Array.from({ length: Math.max(0, 8 - filas.length) }, () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>').join('')}
     </tbody>${x.entrega || borrador ? `<tfoot><tr><td colspan="4" class="n">TOTAL S/</td><td class="n">${n2(tot)}</td></tr></tfoot>` : ''}</table>
     <p class="nota">Solicitado por: ${esc(x.solicitante)}${x.nota ? ' · ' + esc(x.nota) : ''}</p>
@@ -1629,6 +1642,7 @@ function abrirImpresion(titulo, hojas) {
     td.n{text-align:right}tfoot td{font-weight:bold}
     .firmas{display:flex;justify-content:space-between;margin-top:60px}.firmas div{width:40%;text-align:center;border-top:1.5px solid #222;padding-top:6px}
     .nota{color:#666;font-size:11px}
+    .obs{color:#b3261e;font-size:11px;font-weight:bold}.noat{color:#b3261e}
     @media print{body{margin:10mm}.hoja+.hoja{margin-top:0}}
   </style></head><body>${hojas.join('')}
     <script>window.onload=()=>window.print()<\/script></body></html>`);
@@ -1637,7 +1651,7 @@ function abrirImpresion(titulo, hojas) {
 // Imprimir por sucursal en UNA sola hoja A4: útiles de escritorio en la mitad de arriba y limpieza en la de abajo.
 // Si hay muchos materiales, la letra se achica sola y, si hace falta, la tabla pasa a dos columnas para que siempre entre.
 function filasImpresion(x) {
-  return x.entrega ? x.entrega.filter(i => i.cant > 0).map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.producto || i.desc, cu: i.cu, ct: i.ct }))
+  return x.entrega ? x.entrega.map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.producto || i.desc, cu: i.cant > 0 ? i.cu : null, ct: i.cant > 0 ? i.ct : null, obs: i.obs, cantSol: i.cantSol }))
     : (x.items || []).map(i => ({ codigo: i.codigo, cant: i.cant, unidad: i.unidad, desc: i.desc, cu: null, ct: null }));
 }
 function htmlMedia(tipo, l, nombreSuc) {
@@ -1645,7 +1659,7 @@ function htmlMedia(tipo, l, nombreSuc) {
   if (!l.length) return `<section class="media vacia"><div class="cab"><h1>${tit}</h1></div><p class="sin">${esc(nombreSuc)} no tiene solicitudes de ${tipo === 'LIMPIEZA' ? 'materiales de limpieza' : 'útiles de escritorio'} en este estado.</p></section>`;
   const unicos = v => [...new Set(v.filter(Boolean))];
   const filas = l.flatMap(filasImpresion), conCosto = l.some(x => x.entrega), tot = filas.reduce((a, f) => a + (f.ct || 0), 0);
-  const tabla = fs => `<table><thead><tr><th>Código</th><th>Cantidad</th><th>Descripción</th>${conCosto ? '<th>C. unit.</th><th>C. total</th>' : ''}</tr></thead><tbody>${fs.map(f => `<tr><td>${esc(f.codigo || '')}</td><td class="nw">${nq(f.cant)} ${esc(f.unidad || '')}</td><td>${esc(f.desc)}</td>${conCosto ? `<td class="n">${f.cu === null ? '' : n2(f.cu)}</td><td class="n">${f.ct === null ? '' : n2(f.ct)}</td>` : ''}</tr>`).join('')}</tbody></table>`;
+  const tabla = fs => `<table><thead><tr><th>Código</th><th>Cantidad</th><th>Descripción</th>${conCosto ? '<th>C. unit.</th><th>C. total</th>' : ''}</tr></thead><tbody>${fs.map(f => `<tr><td>${esc(f.codigo || '')}</td><td class="nw">${f.cant > 0 ? nq(f.cant) + ' ' + esc(f.unidad || '') : '<b class="noat">NO ATENDIDO</b>'}</td><td>${esc(f.desc)}${f.cant > 0 && f.cantSol && f.cant < f.cantSol ? ` <span class="nota">(pidió ${nq(f.cantSol)})</span>` : ''}${f.obs ? `<br><span class="obs">Obs.: ${esc(f.obs)}</span>` : ''}</td>${conCosto ? `<td class="n">${f.cu === null ? '' : n2(f.cu)}</td><td class="n">${f.ct === null ? '' : n2(f.ct)}</td>` : ''}</tr>`).join('')}</tbody></table>`;
   const mitad = Math.ceil(filas.length / 2);
   return `<section class="media">
     <div class="cab"><h1>${tit}</h1><img src="${esc(new URL('logo.png', location.href).href)}" alt=""></div>
@@ -1680,6 +1694,7 @@ function imprimirSucursalUnaHoja(nombreSuc, l) {
     .dos{display:grid;grid-template-columns:1fr 1fr;gap:2mm}.dos[hidden],.una[hidden]{display:none}
     .tot{margin:0;text-align:right;font-weight:bold}
     .nota{color:#555;font-size:.85em;margin:0}
+    .obs{color:#b3261e;font-size:.9em;font-weight:bold}.noat{color:#b3261e;font-size:.9em}
     .firmas{display:flex;justify-content:space-between;margin-top:auto;padding-top:7mm}.firmas div{width:42%;text-align:center;border-top:1.2px solid #222;padding-top:1mm;font-size:.9em}
     .sin{color:#777;font-style:italic;margin:6mm 0}
   </style></head><body><div class="hoja">${htmlMedia('ESCRITORIO', de('ESCRITORIO'), nombreSuc)}${htmlMedia('LIMPIEZA', de('LIMPIEZA'), nombreSuc)}</div>
@@ -1710,27 +1725,42 @@ function abrirSalidas() {
 }
 async function cargarSalidas() {
   const mes = $('sMes').value || mesISO();
-  $('sFilas').innerHTML = '<tr><td colspan="10" class="vacio">Cargando…</td></tr>';
+  $('sFilas').innerHTML = '<tr><td colspan="11" class="vacio">Cargando…</td></tr>';
   try {
-    const s = await getDocs(query(collection(db, 'movimientos'), where('fecha', '>=', mes + '-01'), where('fecha', '<=', mes + '-31')));
+    const [s, at] = await Promise.all([
+      getDocs(query(collection(db, 'movimientos'), where('fecha', '>=', mes + '-01'), where('fecha', '<=', mes + '-31'))),
+      getDocs(query(collection(db, 'solicitudes'), where('estado', '==', 'ATENDIDA'))).catch(() => ({ docs: [] }))
+    ]);
+    // lo que se pidió y no se entregó (con su observación), de las solicitudes atendidas este mes
+    const noAt = at.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => (x.fechaEntrega || '').startsWith(mes))
+      .flatMap(x => (x.entrega || []).filter(i => !(i.cant > 0)).map((i, k) => ({
+        id: `noat-${x.id}-${k}`, noAt: true, tipo: 'SALIDA', fecha: x.fechaEntrega, codigo: '', producto: i.desc, cant: 0, cantSol: i.cantSol, unidad: i.unidad || '',
+        tercero: x.centro, persona: x.recibidoPor || '', documento: `Solicitud N.º ${x.numero}`, solicitudId: x.id, obs: i.obs || '', ct: 0, usuario: x.atendidoPor || '', ms: x.atendidoMs || 0
+      })));
     SAL.lista = s.docs.map(d => ({ id: d.id, ...d.data() }))
       .filter(m => (m.tipo === 'SALIDA' && m.origen !== 'ANULACION') || (m.tipo === 'AJUSTE' && m.origen !== 'SALDO INICIAL'))
+      .concat(noAt)
       .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.ms || 0) - (a.ms || 0));
     pintarSalidas();
-  } catch (e) { $('sFilas').innerHTML = `<tr><td colspan="10"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
+  } catch (e) { $('sFilas').innerHTML = `<tr><td colspan="11"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
 }
 function filtrarSalidas() {
   const t = $('sTipo').value, q = norm($('sBuscar').value);
-  return SAL.lista.filter(m => (!t || m.tipo === t) && (!q || norm([m.codigo, m.producto, nombreCC(m.tercero), m.persona, m.documento].join(' ')).includes(q)));
+  return SAL.lista.filter(m => (!t || (t === 'NOAT' ? m.noAt : m.tipo === t)) && (!q || norm([m.codigo, m.producto, nombreCC(m.tercero), m.persona, m.documento, m.obs].join(' ')).includes(q)));
 }
 function pintarSalidas() {
   const l = filtrarSalidas(), adm = YO.rol === 'ADMIN';
   const tot = r2(l.filter(m => m.tipo === 'SALIDA').reduce((a, m) => a + (m.ct || 0), 0));
-  $('sRes').innerHTML = `<span><b>${l.length}</b> movimientos</span><span>Costo de lo entregado: <b>S/ ${n2(tot)}</b></span>`;
-  $('sFilas').innerHTML = l.length ? l.map(m => `<tr><td>${fmtF(m.fecha)}</td><td>${esc(m.codigo)}</td><td>${esc(m.producto)}${m.tipo === 'AJUSTE' ? ` <span class="pill AJUSTE">${esc(m.origen)}</span>` : ''}</td>
-      <td class="num"><b>${nq(m.cant)}</b> <small class="nota">${esc(m.unidad || '')}</small></td><td>${esc(nombreCC(m.tercero))}</td><td>${esc(m.persona || '')}</td><td>${esc(m.documento || '')}</td>
-      <td class="num">${n2(m.ct)}</td><td><small>${esc(m.usuario || '')}</small></td><td>${adm ? `<button class="btn peligro chico" type="button" data-sdel="${esc(m.id)}">Eliminar</button>` : ''}</td></tr>`).join('')
-    : '<tr><td colspan="10" class="vacio">No hay salidas con este filtro.</td></tr>';
+  const nNo = l.filter(m => m.noAt).length;
+  $('sRes').innerHTML = `<span><b>${l.length - nNo}</b> movimientos</span>${nNo ? `<span style="color:var(--rojo)">No atendidos: <b>${nNo}</b></span>` : ''}<span>Costo de lo entregado: <b>S/ ${n2(tot)}</b></span>`;
+  $('sFilas').innerHTML = l.length ? l.map(m => {
+    const parcial = !m.noAt && m.cantSol && m.cant < m.cantSol;
+    return `<tr class="${m.noAt ? 'sol-no' : parcial ? 'sol-parcial' : ''}"><td>${fmtF(m.fecha)}</td><td>${esc(m.codigo)}</td><td>${esc(m.producto)}${m.tipo === 'AJUSTE' ? ` <span class="pill AJUSTE">${esc(m.origen)}</span>` : ''}${m.noAt ? ' <span class="pill RECHAZADO">NO ATENDIDO</span>' : ''}</td>
+      <td class="num">${m.noAt ? `<b>0</b> <small class="nota">de ${nq(m.cantSol)} ${esc(m.unidad || '')}</small>` : `<b>${nq(m.cant)}</b> <small class="nota">${esc(m.unidad || '')}${parcial ? ` de ${nq(m.cantSol)}` : ''}</small>`}</td><td>${esc(nombreCC(m.tercero))}</td><td>${esc(m.persona || '')}</td><td>${esc(m.documento || '')}</td>
+      <td>${m.obs ? `<span class="obs-txt">${esc(m.obs)}</span>` : ''}</td>
+      <td class="num">${m.noAt ? '' : n2(m.ct)}</td><td><small>${esc(m.usuario || '')}</small></td><td>${adm && !m.noAt ? `<button class="btn peligro chico" type="button" data-sdel="${esc(m.id)}">Eliminar</button>` : ''}</td></tr>`;
+  }).join('')
+    : '<tr><td colspan="11" class="vacio">No hay salidas con este filtro.</td></tr>';
 }
 $('sMes').addEventListener('change', cargarSalidas);
 // Imprimir lo entregado a una sucursal en una sola hoja (escritorio arriba, limpieza abajo)
@@ -1756,7 +1786,7 @@ $('sImpSuc').addEventListener('click', async e => {
           tipo, numero: ss.length ? ss.map(x => x.numero).join(', ') : '—', fecha: ss.length ? ss.map(x => x.fecha).sort()[0] : '', fechaEntrega: f,
           solicitante: unicos(ss.map(x => x.solicitante)).join(', '), nota: '',
           entregadoPor: unicos(ss.map(x => x.entregadoPor)).join(', ') || unicos(md.map(m => m.usuario)).join(', '), recibidoPor: unicos(md.map(m => m.persona)).join(', '),
-          entrega: md.map(m => ({ codigo: m.codigo, cant: m.cant, unidad: m.unidad, producto: m.producto, desc: m.producto, cu: m.cu || 0, ct: m.ct || 0 }))
+          entrega: md.map(m => ({ codigo: m.codigo, cant: m.cant, unidad: m.unidad, producto: m.producto, desc: m.producto, cu: m.cu || 0, ct: m.ct || 0, obs: m.obs || '', cantSol: m.cantSol }))
         };
       });
     };
@@ -1765,7 +1795,8 @@ $('sImpSuc').addEventListener('click', async e => {
   ocupado(b, false);
 });
 ['sTipo', 'sBuscar'].forEach(i => $(i).addEventListener('input', pintarSalidas));
-$('sCsv').addEventListener('click', () => descargarCSV(`salidas_${$('sMes').value}.csv`, filasKardex(filtrarSalidas())));
+$('sCsv').addEventListener('click', () => descargarCSV(`salidas_${$('sMes').value}.csv`, [['Fecha', 'Estado', 'Código', 'Producto', 'Cant. pedida', 'Cant. entregada', 'Unidad', 'Centro de costo', 'Entregado a', 'Documento', 'Observación', 'Costo unit.', 'Costo total', 'Registró']]
+  .concat(filtrarSalidas().map(m => [fmtF(m.fecha), m.noAt ? 'NO ATENDIDO' : m.tipo === 'AJUSTE' ? m.origen : m.cantSol && m.cant < m.cantSol ? 'PARCIAL' : 'ENTREGADO', m.codigo || '', m.producto, m.cantSol ? String(m.cantSol).replace('.', ',') : '', String(m.cant).replace('.', ','), m.unidad || '', nombreCC(m.tercero), m.persona || '', m.documento || '', m.obs || '', m.noAt ? '' : numCSV(m.cu), m.noAt ? '' : numCSV(m.ct), m.usuario || '']))));
 $('sFilas').addEventListener('click', async e => {
   const b = e.target.closest('[data-sdel]'); if (!b) return;
   const m = SAL.lista.find(x => x.id === b.dataset.sdel); if (!m) return;

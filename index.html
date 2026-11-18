@@ -256,6 +256,10 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
   .dudoso{background:none}
   .hoja [contenteditable]:hover,.hoja [contenteditable]:focus{background:none}
 }
+.sol-no td{background:var(--rojo-f)}
+.sol-parcial td{background:var(--ambar-f)}
+.obs-req{border-color:var(--rojo)!important;background:#fff}
+.obs-txt{color:var(--rojo);font-size:12px}
 </style>
 </head>
 <body>
@@ -369,11 +373,11 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
         </div>
         <div class="filtros">
           <label>Mes<input type="month" id="sMes"></label>
-          <label>Tipo<select id="sTipo"><option value="SALIDA">Salidas</option><option value="AJUSTE">Ajustes</option><option value="">Salidas y ajustes</option></select></label>
+          <label>Tipo<select id="sTipo"><option value="SALIDA">Salidas (con lo no atendido)</option><option value="NOAT">Solo lo no atendido</option><option value="AJUSTE">Ajustes</option><option value="">Salidas y ajustes</option></select></label>
           <label class="crece">Buscar<input type="search" id="sBuscar" placeholder="Producto, destino, persona o motivo"></label>
         </div>
         <div class="resumen" id="sRes"></div>
-        <div class="tabla"><table><thead><tr><th>Fecha</th><th>Código</th><th>Producto</th><th class="num">Cantidad</th><th>Destino / área</th><th>Entregado a</th><th>Motivo / documento</th><th class="num">Costo total</th><th>Registró</th><th></th></tr></thead><tbody id="sFilas"><tr><td colspan="10" class="vacio">Cargando…</td></tr></tbody></table></div>
+        <div class="tabla"><table><thead><tr><th>Fecha</th><th>Código</th><th>Producto</th><th class="num">Cantidad</th><th>Destino / área</th><th>Entregado a</th><th>Motivo / documento</th><th>Observación</th><th class="num">Costo total</th><th>Registró</th><th></th></tr></thead><tbody id="sFilas"><tr><td colspan="11" class="vacio">Cargando…</td></tr></tbody></table></div>
       </section>
 
       <!-- RRHH -->
@@ -601,8 +605,9 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
         <label>Entregado por<input id="solEntPor" maxlength="80"></label>
         <label class="s2">Recibido por<input id="solRecPor" maxlength="80" list="dlPersonal"></label>
       </div>
-      <div class="tabla" style="margin-top:10px"><table><thead><tr><th>#</th><th>Lo que pidió la sucursal</th><th class="num">Pidió</th><th>Material del kardex</th><th class="num">Stock</th><th class="num">Entregar</th><th class="num">Costo unit.</th><th class="num">Costo total</th></tr></thead><tbody id="solItems"></tbody><tfoot><tr><td colspan="7" class="num"><b>Total</b></td><td class="num"><b id="solTotal">0.00</b></td></tr></tfoot></table></div>
-      <p class="nota">Si no hay un material, deja “Entregar” en 0: esa línea queda como no entregada. Si lo que pidió no está en el kardex, elige el material equivalente de la lista.</p>
+      <div class="tabla" style="margin-top:10px"><table><thead><tr><th>#</th><th>Lo que pidió la sucursal</th><th class="num">Pidió</th><th>Material del kardex</th><th class="num">Stock</th><th class="num">Entregar</th><th>Observación</th><th class="num">Costo unit.</th><th class="num">Costo total</th></tr></thead><tbody id="solItems"></tbody><tfoot><tr><td colspan="8" class="num"><b>Total</b></td><td class="num"><b id="solTotal">0.00</b></td></tr></tfoot></table></div>
+      <datalist id="dlObs"><option value="SIN STOCK"><option value="SE ENTREGARÁ LA PRÓXIMA SEMANA"><option value="EN COMPRA"><option value="ENTREGA PARCIAL POR STOCK"><option value="NO CORRESPONDE AL ÁREA"><option value="PEDIDO EXCESIVO"><option value="PRODUCTO DESCONTINUADO"><option value="YA SE ENTREGÓ ANTES"></datalist>
+      <p class="nota">Si no hay un material, pon “Entregar” en 0 y escribe la <b>observación</b> (por ejemplo: SIN STOCK). Si entregas menos de lo pedido, también puedes explicarlo. La observación sale en el PDF y en el Excel. Si lo que pidió no está en el kardex, elige el material equivalente de la lista.</p>
       <div class="msg" id="solMsg" style="text-align:left"></div>
     </div>
   </form>
@@ -657,6 +662,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.18b"></script>
+<script type="module" src="app.js?v=2026.11.18c"></script>
 </body>
 </html>
