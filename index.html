@@ -58,7 +58,9 @@ input:disabled,select:disabled,textarea:disabled{background:#f4f2ef;color:#444}
 .top button:hover{background:rgba(255,255,255,.32)}
 .cuerpo{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100% - 54px)}
 .side{background:var(--blanco);border-right:1px solid var(--borde);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
-.side button{background:none;border:0;text-align:left;padding:9px 12px;border-radius:6px;cursor:pointer;font-size:13.5px;color:var(--texto)}
+.side button{background:none;border:0;text-align:left;padding:9px 12px;border-radius:6px;cursor:pointer;font-size:13.5px;color:var(--texto);display:flex;align-items:center;gap:10px}
+.side button svg{color:var(--gris)}
+.side button.act svg{color:var(--pri)}
 .side button:hover{background:var(--suave2)}
 .side button.act{background:var(--suave);color:var(--pri-osc);font-weight:bold;box-shadow:inset 3px 0 var(--marca)}
 .side .grupo{font-size:11px;letter-spacing:.6px;color:var(--gris);padding:12px 12px 4px;text-transform:uppercase}
@@ -88,6 +90,49 @@ tr.anulado td:last-child{text-decoration:none}
 .pill.SALIDA{background:var(--rojo-f);color:var(--rojo)}
 .pill.AJUSTE{background:#eceff3;color:#3d4a5c}
 .acciones{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+
+/* Vista lista + documento (como un sistema de inventario: lista a la izquierda, documento a la derecha) */
+.md{display:grid;grid-template-columns:minmax(300px,4fr) minmax(0,8fr);gap:14px;align-items:start}
+.md-lista{background:var(--blanco);border:1px solid var(--borde);border-radius:10px;overflow:auto;max-height:calc(100vh - 230px);position:sticky;top:66px}
+.md-item{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #efecea;padding:11px 14px;cursor:pointer;font:inherit;color:inherit;border-left:3px solid transparent}
+.md-item:hover{background:var(--suave2)}
+.md-item.act{background:var(--suave);border-left-color:var(--marca)}
+.md-item .l1,.md-item .l2,.md-item .l3{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.md-item .l1 b{font-size:13.5px}
+.md-item .l1 .monto{font-weight:bold;font-variant-numeric:tabular-nums;white-space:nowrap}
+.md-item .l2{font-size:12.5px;color:var(--pri);margin-top:2px}
+.md-item .l2 .gris{color:var(--gris)}
+.md-item .l3{font-size:11.5px;color:var(--gris);margin-top:2px}
+.md-item.anulado .l1,.md-item.anulado .l2{text-decoration:line-through;color:#999}
+.md-det{background:var(--blanco);border:1px solid var(--borde);border-radius:10px;min-height:300px;min-width:0}
+.md-det>.vacio{padding:60px 20px}
+.tb{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--borde);background:#faf9f7;border-radius:10px 10px 0 0;flex-wrap:wrap;position:sticky;top:54px;z-index:1}
+.tb .tit{font-size:17px;font-weight:bold;margin-right:auto}
+.tb .ico{display:inline-flex;align-items:center;gap:6px;background:var(--blanco);border:1px solid var(--borde);border-radius:7px;padding:6px 10px;cursor:pointer;color:var(--texto);font-size:12.5px}
+.tb .ico:hover{border-color:var(--pri);color:var(--pri)}
+.tb .ico.peligro:hover{border-color:var(--rojo);color:var(--rojo)}
+.tb .ico.prim{background:var(--pri);border-color:var(--pri);color:#fff}
+.tb .ico.prim:hover{background:var(--pri-osc);color:#fff}
+.tb .ico svg,.side svg{width:16px;height:16px;flex:none}
+.doc{padding:22px 26px;display:flex;flex-direction:column;gap:16px}
+.doc-cab{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.doc-cab h3{margin:0;font-size:22px;letter-spacing:.3px}
+.doc-cab .sub{color:var(--gris);font-size:13px;margin-top:4px}
+.doc-cab .sub b{color:var(--texto)}
+.estado{display:inline-block;font-size:11.5px;font-weight:bold;padding:3px 10px;border-radius:4px;letter-spacing:.4px;margin-top:8px}
+.estado.ok{background:var(--ok-f);color:var(--ok)}.estado.am{background:var(--ambar-f);color:var(--ambar)}.estado.no{background:var(--rojo-f);color:var(--rojo)}.estado.gr{background:#eceff3;color:#3d4a5c}
+.doc-datos{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 22px}
+.doc-datos div{font-size:12px;color:var(--gris);text-transform:uppercase;letter-spacing:.3px}
+.doc-datos div b{display:block;font-size:13.5px;color:var(--texto);text-transform:none;letter-spacing:0;margin-top:2px;font-weight:600}
+.doc table{font-size:13px}
+.doc th{background:#f6f4f1;text-transform:uppercase;font-size:11px;letter-spacing:.4px;position:static}
+.doc td{border-bottom:1px solid #efecea}
+.doc .tots{align-self:flex-end;min-width:280px;display:grid;grid-template-columns:1fr auto;gap:6px 24px;font-size:13.5px}
+.doc .tots .g{font-size:16px;font-weight:bold;border-top:1px solid var(--borde);padding-top:6px}
+.doc .aviso-par{background:#eef5fb;border:1px solid #cfe2f1;color:#1d4f73;border-radius:8px;padding:8px 12px;font-size:13px}
+.doc .aviso-par button{background:none;border:0;color:#1d4f73;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+.sub-tit{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--pri-osc);font-weight:bold;margin:0}
+@media (max-width:1000px){ .md{grid-template-columns:1fr} .md-lista{position:static;max-height:45vh} .tb{position:static} }
 
 /* Tarjetas de resumen */
 .tarjetas{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
@@ -358,7 +403,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
           <label class="crece">Buscar<input type="search" id="solBuscar" placeholder="N.º, sucursal, solicitante o material"></label>
         </div>
         <div class="resumen" id="solRes"></div>
-        <div class="tabla"><table><thead><tr><th>N.º</th><th>Fecha</th><th>Tipo</th><th>Sucursal / centro de costo</th><th>Solicitado por</th><th>Materiales</th><th>Estado</th><th></th></tr></thead><tbody id="solFilas"><tr><td colspan="8" class="vacio">Cargando…</td></tr></tbody></table></div>
+        <div class="md" id="solMD"><div class="md-lista" id="solFilas"><div class="vacio">Cargando…</div></div><div class="md-det" id="solDet"><div class="vacio">Elige una solicitud de la lista para verla.</div></div></div>
       </section>
       <section id="m-salidas" class="mod" hidden>
         <div class="cab"><div><h2>Salida de materiales</h2><p class="nota">Entregas a cada área o centro de costos. Cada salida descuenta el stock del kardex a costo promedio.</p></div>
@@ -660,6 +705,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.18f"></script>
+<script type="module" src="app.js?v=2026.11.19a"></script>
 </body>
 </html>
