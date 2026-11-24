@@ -148,6 +148,15 @@ tr.anulado td:last-child{text-decoration:none}
 .sub-tit{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--pri-osc);font-weight:bold;margin:0}
 @media (max-width:1000px){ .tb{position:static} .lst .opc{display:none} }
 
+/* Buscador de productos */
+.bp{position:fixed;z-index:1000;background:#fff;border:1px solid var(--pri);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.18);max-height:320px;overflow:auto;padding:4px 0}
+.bp div{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:8px 12px;cursor:pointer;font-size:13px}
+.bp div.act,.bp div:hover{background:var(--suave)}
+.bp .cod{color:var(--gris);font-size:12px;font-variant-numeric:tabular-nums}
+.bp .nom b,.bp .cod b{color:var(--pri-osc)}
+.bp .stk{color:var(--ok);font-size:12px;white-space:nowrap}.bp .stk.cero{color:var(--rojo)}
+.bp .vacia{display:block;color:var(--gris);font-style:italic;cursor:default}
+.bp .vacia:hover{background:none}
 /* Tarjetas de resumen */
 .tarjetas{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .tarjeta{background:var(--blanco);border:1px solid var(--borde);border-radius:8px;padding:14px 16px}
@@ -648,7 +657,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
     <div class="dlg-cab"><h2 id="mTit">Nueva salida de materiales</h2><div class="acc"><button type="submit" class="btn">Registrar</button><button type="button" class="btn sec" id="mCerrar">Cancelar</button></div></div>
     <div class="dlg-cuerpo">
       <div class="g2">
-        <label class="s2">Producto<input id="mProd" list="dlProd" required></label>
+        <label class="s2">Producto<input id="mProd" data-bp autocomplete="off" required placeholder="Escribe para buscar el material"></label>
         <label>Movimiento<select id="mTipo"><option value="SALIDA">Salida (consumo o entrega)</option><option value="AJUSTE+">Ajuste de ingreso (+)</option><option value="AJUSTE-">Ajuste de salida (−)</option></select></label>
         <label>Fecha<input id="mFecha" type="date" required></label>
         <label>Cantidad<input id="mCant" type="number" step="any" min="0" required></label>
@@ -701,8 +710,8 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
     <div class="dlg-cab"><h2 id="unTit">Unir productos duplicados</h2><div class="acc"><button type="submit" class="btn">Unir</button><button type="button" class="btn sec" id="unCerrar">Cancelar</button></div></div>
     <div class="dlg-cuerpo">
       <p class="nota" style="margin:0">Pasa todo el kardex del producto duplicado (entradas, salidas y facturas) al producto que se queda, recalcula el stock y elimina el duplicado.</p>
-      <label>Producto que SE QUEDA<input id="unA" list="dlProd" required placeholder="Ej.: P00300 · CINTA SCOCH SHURTAPE"></label>
-      <label>Producto duplicado que SE ELIMINA<input id="unB" list="dlProd" required placeholder="Ej.: P00371 · CINTA SCOCH SHURTAPE 3/4 X36 YARDAS"></label>
+      <label>Producto que SE QUEDA<input id="unA" data-bp autocomplete="off" required placeholder="Ej.: P00300 · CINTA SCOCH SHURTAPE"></label>
+      <label>Producto duplicado que SE ELIMINA<input id="unB" data-bp autocomplete="off" required placeholder="Ej.: P00371 · CINTA SCOCH SHURTAPE 3/4 X36 YARDAS"></label>
       <div class="nota" id="unInfo"></div>
       <div class="msg" id="unMsg" style="text-align:left"></div>
     </div>
@@ -758,6 +767,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.24c"></script>
+<script type="module" src="app.js?v=2026.11.24d"></script>
 </body>
 </html>
