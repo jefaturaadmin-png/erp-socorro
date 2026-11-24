@@ -23,7 +23,7 @@ const buscar = (txt, tipo) => { const t = norm(txt); return t ? catDe(tipo).find
 
 function fila(b, i) {
   const q = b.dataset.tipo === 'LIMPIEZA' ? 'de limpieza ' : 'de escritorio ';
-  return `<tr><td class="c">${i + 1}</td><td><input data-f="desc" autocomplete="off" maxlength="120" placeholder="Escribe para buscar el material" aria-label="Material ${q}${i + 1}"></td>
+  return `<tr><td class="c">${i + 1}</td><td><input data-f="desc" autocomplete="off" maxlength="120" placeholder="Busca el material (o pide uno nuevo con “Otro”)" aria-label="Material ${q}${i + 1}"><span class="tag" hidden>MATERIAL NUEVO</span></td>
     <td class="w-cant"><input data-f="cant" autocomplete="off" type="number" min="0" step="any" inputmode="decimal" aria-label="Cantidad ${q}${i + 1}"></td><td class="w-uni"><input data-f="uni" autocomplete="off" maxlength="20" placeholder="Unidad" aria-label="Unidad ${q}${i + 1}"></td>
     <td><button type="button" class="x" data-quitar aria-label="Quitar material ${q}${i + 1}">×</button></td></tr>`;
 }
@@ -52,6 +52,7 @@ BLOQUES.forEach(b => {
   cuerpo(b).addEventListener('input', e => {
     if (e.target.dataset.f === 'uni') { delete e.target.dataset.auto; abrirSug(e.target, b); return; }
     if (e.target.dataset.f !== 'desc') return;
+    marcarOtro(e.target, false);
     abrirSug(e.target, b);
     const p = buscar(e.target.value, b.dataset.tipo), u = e.target.closest('tr').querySelector('[data-f="uni"]');
     if (p && p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; }
@@ -72,6 +73,7 @@ function abrirSug(inp, b) {
   const ops = base.filter(p => { const n = norm(p.n); return palabras.every(w => n.includes(w)); })
     .sort((x, y) => (norm(y.n).startsWith(t) - norm(x.n).startsWith(t)) || x.n.localeCompare(y.n, 'es')).slice(0, 10);
   if (ops.length === 1 && norm(ops[0].n) === t) return cerrarSug(); // ya está escrito completo
+  if (!esUni && limpio(inp.value).length >= 3) ops.push({ otro: true, n: limpio(inp.value).toUpperCase() }); // pedir un material que no está en la lista
   Object.assign(SUG, { inp, b, ops, act: ops.length ? 0 : -1 });
   // resalta en negrita lo que coincide con lo escrito
   const marca = n => {
@@ -82,16 +84,26 @@ function abrirSug(inp, b) {
     for (let k = 0; k < n.length; k++) { if (on[k] !== ab) { h += ab ? '</b>' : '<b>'; ab = on[k]; } h += esc(n[k]); }
     return h + (ab ? '</b>' : '');
   };
-  SUG.el.innerHTML = ops.length ? ops.map((p, i) => `<div role="option" data-i="${i}" class="${i === SUG.act ? 'act' : ''}"><span>${marca(p.n)}</span>${p.u ? `<small>${esc(p.u)}</small>` : ''}</div>`).join('')
-    : (esUni ? '' : '<div class="vacia">No está en la lista: se enviará tal como lo escribiste</div>');
+  SUG.el.innerHTML = ops.length ? ops.map((p, i) => p.otro
+      ? `<div role="option" data-i="${i}" class="otro${i === SUG.act ? ' act' : ''}"><span>➕ Otro: <b>“${esc(p.n)}”</b></span><small>material nuevo, no está en la lista</small></div>`
+      : `<div role="option" data-i="${i}" class="${i === SUG.act ? 'act' : ''}"><span>${marca(p.n)}</span>${p.u ? `<small>${esc(p.u)}</small>` : ''}</div>`).join('')
+    : (esUni ? '' : '<div class="vacia">Sigue escribiendo para buscar el material</div>');
   if (!SUG.el.innerHTML) return cerrarSug();
   const r = inp.getBoundingClientRect();
   Object.assign(SUG.el.style, { left: (r.left + scrollX) + 'px', top: (r.bottom + scrollY + 2) + 'px', width: Math.max(r.width, esUni ? 140 : 280) + 'px' });
   SUG.el.hidden = false;
 }
+// línea pedida como “Otro” (material nuevo): se marca para que administración lo sepa
+function marcarOtro(inp, si) {
+  if (si) inp.dataset.otro = '1'; else delete inp.dataset.otro;
+  const tag = inp.parentElement.querySelector('.tag'); if (tag) tag.hidden = !si;
+  inp.classList.remove('inval');
+  if (si && !document.querySelector('input.inval')) $('sMsg').hidden = true; // ya no hay nada que corregir
+}
 function elegirSug(i) {
   const p = SUG.ops[i], inp = SUG.inp; if (!p || !inp) return;
   inp.value = p.n;
+  if (inp.dataset.f === 'desc') marcarOtro(inp, !!p.otro);
   if (inp.dataset.f === 'uni') delete inp.dataset.auto;
   else { const u = inp.closest('tr').querySelector('[data-f="uni"]'); if (p.u && (!u.value || u.dataset.auto)) { u.value = p.u; u.dataset.auto = '1'; } }
   cerrarSug();
@@ -128,9 +140,9 @@ $('fSol').addEventListener('keydown', e => {
   destino.focus(); destino.select?.();
 });
 const leerBloque = b => [...cuerpo(b).rows].map(r => {
-  const desc = limpio(r.querySelector('[data-f="desc"]').value).toUpperCase(), cant = Number(r.querySelector('[data-f="cant"]').value) || 0, p = buscar(desc, b.dataset.tipo);
+  const di = r.querySelector('[data-f="desc"]'), desc = limpio(di.value).toUpperCase(), cant = Number(r.querySelector('[data-f="cant"]').value) || 0, p = buscar(desc, b.dataset.tipo);
   const unidad = limpio(r.querySelector('[data-f="uni"]').value).toUpperCase();
-  return { desc: p ? p.n : desc, prodId: p ? p.i : null, codigo: p ? p.c : '', unidad, cant };
+  return { desc: p ? p.n : desc, prodId: p ? p.i : null, codigo: p ? p.c : '', unidad, cant, ...(!p && di.dataset.otro === '1' ? { nuevo: true } : {}), _inp: di, _ok: !!p || di.dataset.otro === '1' };
 }).filter(x => x.desc || x.cant);
 
 $('fSol').addEventListener('submit', async e => {
@@ -138,12 +150,15 @@ $('fSol').addEventListener('submit', async e => {
   const msg = t => { $('sMsg').hidden = !t; $('sMsg').textContent = t || ''; };
   const centro = $('sCentro').value, nombre = limpio($('sNombre').value).toUpperCase(), fecha = hoy(); // siempre la fecha del día en que se envía
   const pedidos = BLOQUES.map(b => ({ tipo: b.dataset.tipo, items: leerBloque(b) })).filter(x => x.items.length);
+  const limpiarItems = l => l.map(({ _inp, _ok, ...i }) => i);
   if (!centro) return msg('Elige tu sucursal o centro de costo.');
   if (nombre.length < 3) return msg('Escribe tu nombre.');
   if (!pedidos.length) return msg('Escribe al menos un material en útiles de escritorio o en materiales de limpieza.');
   for (const x of pedidos) {
     const q = x.tipo === 'LIMPIEZA' ? 'En materiales de limpieza' : 'En útiles de escritorio';
     if (x.items.some(i => !i.desc)) return msg(`${q} hay una cantidad sin descripción del material.`);
+    const malos = x.items.filter(i => !i._ok);
+    if (malos.length) { malos.forEach(i => i._inp.classList.add('inval')); malos[0]._inp.focus(); return msg(`${q}, “${malos[0].desc}” no está en la lista. Elígelo de la lista que aparece al escribir, o pídelo como “➕ Otro” si es un material nuevo.`); }
     if (x.items.some(i => !(i.cant > 0))) return msg(`${q} falta la cantidad de algún material.`);
     if (x.items.length > 40) return msg(`${q} hay más de 40 materiales.`);
   }
@@ -158,7 +173,7 @@ $('fSol').addEventListener('submit', async e => {
         const cRef = doc(db, 'publico', 'contador'), c = await tx.get(cRef);
         const n = (c.exists() ? c.data().n || 0 : 0) + 1;
         tx.set(cRef, { n });
-        tx.set(ref, { numero: n, tipo: x.tipo, fecha, mes: fecha.slice(0, 7), centro, centroNombre: cNombre, solicitante: nombre, nota, items: x.items, estado: 'PENDIENTE', creadoMs: Date.now(), creado: serverTimestamp() });
+        tx.set(ref, { numero: n, tipo: x.tipo, fecha, mes: fecha.slice(0, 7), centro, centroNombre: cNombre, solicitante: nombre, nota, items: limpiarItems(x.items), estado: 'PENDIENTE', creadoMs: Date.now(), creado: serverTimestamp() });
         return n;
       });
       hechos.push({ ...x, numero, id: ref.id });

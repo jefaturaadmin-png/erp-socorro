@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.24d'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.24e'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -1609,7 +1609,7 @@ function pintarDetSolicitud() {
     ...(entregada ? [['Fecha de entrega', fmtF(x.fechaEntrega)], ['Entregado por', esc(x.entregadoPor || '—')], ['Recibido por', esc(x.recibidoPor || '—')]] : [])];
   const filas = entregada
     ? x.entrega.map((i, k) => { const no = !(i.cant > 0); return `<tr class="${no ? 'sol-no' : i.cantSol && i.cant < i.cantSol ? 'sol-parcial' : ''}"><td>${k + 1}</td><td>${esc(i.producto || i.desc)}${i.producto && i.producto !== i.desc ? `<br><small class="nota">Pidió: ${esc(i.desc)}</small>` : ''}</td><td class="num">${nq(i.cantSol)}</td><td class="num"><b>${no ? '—' : nq(i.cant)}</b> ${esc(i.unidad || '')}</td><td>${no ? '<span class="obs-txt">NO ATENDIDO</span> ' : ''}${i.obs ? `<span class="obs-txt">${esc(i.obs)}</span>` : ''}</td><td class="num">${no ? '' : n2(i.cu)}</td><td class="num">${no ? '' : n2(i.ct)}</td></tr>`; }).join('')
-    : (x.items || []).map((i, k) => { const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.desc); const falta = p && p.stock + 1e-9 < i.cant; return `<tr><td>${k + 1}</td><td>${esc(i.desc)}${p ? `<br><small class="nota">${esc(p.codigo)}</small>` : '<br><small class="nota">No está en el kardex</small>'}</td><td class="num"><b>${nq(i.cant)}</b> ${esc(i.unidad || '')}</td><td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td></tr>`; }).join('');
+    : (x.items || []).map((i, k) => { const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.desc); const falta = p && p.stock + 1e-9 < i.cant; return `<tr><td>${k + 1}</td><td>${esc(i.desc)}${p ? `<br><small class="nota">${esc(p.codigo)}</small>` : i.nuevo ? '<br><span class="pill AJUSTE">MATERIAL NUEVO · pedido como “Otro”</span>' : '<br><small class="nota">No está en el kardex</small>'}</td><td class="num"><b>${nq(i.cant)}</b> ${esc(i.unidad || '')}</td><td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td></tr>`; }).join('');
   $('solDet').innerHTML = `<div class="tb">${botonIco('', '← Volver a la lista', 'data-solvolver="1"')}<span class="tit">Solicitud N.º ${x.numero}</span>${acc.join('')}</div>
     <div class="doc">
       <div class="doc-cab"><div><h3>${tipoSolTxt(x) === 'LIMPIEZA' ? '🧽 MATERIALES DE LIMPIEZA' : '✏️ ÚTILES DE ESCRITORIO'}</h3><div class="sub">Solicitud N.º <b>${x.numero}</b> · ${esc(x.centroNombre || x.centro)}</div>${est}</div>
@@ -1731,7 +1731,7 @@ $('solXlsL').addEventListener('click', e => excelPendientes('LIMPIEZA', e.curren
 let SOL = null;
 const lineasDe = x => (x.entrega || x.items || []).map(i => {
   const p = (i.prodId && PRODUCTOS.get(i.prodId)) || buscarProd(i.producto || i.desc);
-  return { desc: i.desc, cantSol: i.cantSol ?? i.cant, unidadSol: i.unidad || '', prodId: p?.id || null, entregar: x.entrega ? i.cant : (i.cant || 0), cu: i.cu, obs: i.obs || '' };
+  return { desc: i.desc, cantSol: i.cantSol ?? i.cant, unidadSol: i.unidad || '', prodId: p?.id || null, entregar: x.entrega ? i.cant : (i.cant || 0), cu: i.cu, obs: i.obs || '', nuevo: !!i.nuevo };
 });
 // La otra mitad del mismo pedido: misma sucursal, fecha y solicitante, el otro tipo y número correlativo seguido
 const parejaDe = x => SOLS.lista.find(y => y.id !== x.id && y.estado === x.estado && String(y.centro) === String(x.centro) && y.fecha === x.fecha
@@ -1768,8 +1768,8 @@ function pintarLineasSol() {
       const falta = SOL.editable && p && Number(l.entregar) + usado > p.stock + 1e-9;
       const no = !(Number(l.entregar) > 0), parcial = !no && Number(l.entregar) < Number(l.cantSol);
       const id = `${pi}-${i}`;
-      return `<tr data-i="${id}" class="${no ? 'sol-no' : parcial ? 'sol-parcial' : ''}"><td class="c">${i + 1}</td><td>${esc(l.desc)}</td><td class="num">${nq(l.cantSol)} <small class="nota">${esc(l.unidadSol)}</small></td>
-        <td><input data-f="prod" data-bp autocomplete="off" value=""${p ? esc(etiquetaProd(p)) : ''}" placeholder="Elegir material del kardex"${dis} aria-label="Material del kardex para la línea ${i + 1}" style="min-width:240px"></td>
+      return `<tr data-i="${id}" class="${no ? 'sol-no' : parcial ? 'sol-parcial' : ''}"><td class="c">${i + 1}</td><td>${esc(l.desc)}${l.nuevo ? '<br><span class="pill AJUSTE">MATERIAL NUEVO</span>' : ''}</td><td class="num">${nq(l.cantSol)} <small class="nota">${esc(l.unidadSol)}</small></td>
+        <td><input data-f="prod" data-bp autocomplete="off" value="${p ? esc(etiquetaProd(p)) : ''}" placeholder="Escribe para buscar el material"${dis} aria-label="Material del kardex para la línea ${i + 1}" style="min-width:240px"></td>
         <td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold" title="No alcanza el stock"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td>
         <td class="num"><input class="w6 num" type="number" min="0" step="any" data-f="cant" value="${l.entregar}"${dis} aria-label="Cantidad a entregar en la línea ${i + 1}"></td>
         <td>${SOL.editable ? `<input data-f="obs" list="dlObs" maxlength="120" value="${esc(l.obs || '')}" class="${no && !limpio(l.obs) ? 'obs-req' : ''}" placeholder="${no ? '¿Por qué no se entrega?' : parcial ? '¿Por qué se entrega menos?' : 'Opcional'}" aria-label="Observación de la línea ${i + 1}" style="min-width:190px">`
