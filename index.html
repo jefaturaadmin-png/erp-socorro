@@ -325,6 +325,14 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
   .hoja [contenteditable]:hover,.hoja [contenteditable]:focus{background:none}
 }
 .sol-no td{background:var(--rojo-f)}
+.ent tr.grp{cursor:pointer}
+.ent tr.grp td{border-bottom:1px solid #edf0f2}
+.ent tr.grp.abierto td{background:#f6faf7;border-bottom:0}
+.ent .flecha{color:var(--gris);width:22px;text-align:center;font-size:12px}
+.ent tr.det>td{padding:0 12px 14px 40px;background:#f6faf7}
+.ent tr.det table{background:#fff;border:1px solid var(--borde);border-radius:6px;font-size:12.5px}
+.ent tr.det th{background:#f3f4f6;font-size:11.5px;position:static}
+.ent .sols span{display:inline-block;margin-right:6px;white-space:nowrap}
 .sol-sec td{font-weight:bold;padding-top:10px;padding-bottom:6px;border-top:2px solid var(--borde)}
 .sol-sec.esc td{background:var(--suave);color:var(--pri)}
 .sol-sec.lim td{background:#e8f2fa;color:#1d4f73}
@@ -442,21 +450,15 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
         <div class="tabla"><table class="lst"><thead><tr><th>Código</th><th>Material</th><th class="num">Stock sistema</th><th class="num">Conteo físico</th><th class="num">Diferencia</th><th class="num">Costo actual</th><th class="num" title="Opcional: si lo dejas vacío se usa el costo actual (o el de la última compra)">Costo nuevo (opcional)</th><th class="num">Valor dif. (S/)</th></tr></thead><tbody id="invFilas"></tbody></table></div>
       </section>
       <section id="m-salidas" class="mod" hidden>
-        <div class="cab"><div><h2>Salida de materiales</h2><p class="nota">Entregas a cada área o centro de costos. Cada salida descuenta el stock del kardex a costo promedio.</p></div>
+        <div class="cab"><div><h2>Salida de materiales</h2><p class="nota">Entregas por sucursal y fecha. Haz clic en una entrega para ver sus materiales; con “Imprimir” sale en una hoja (escritorio arriba, limpieza abajo).</p></div>
           <div class="acc"><button class="btn" type="button" id="sNueva">+ Nueva salida</button><button class="btn sec" type="button" id="sCsv">Exportar Excel</button></div></div>
-        <div class="filtros">
-          <label class="crece">Imprimir por sucursal<select id="sSuc"></select></label>
-          <label>Día de entrega<input type="date" id="sDia" title="Vacío = todo el mes elegido abajo"></label>
-          <button class="btn" type="button" id="sImpSuc">Imprimir sucursal</button>
-          <p class="nota" style="margin:0;align-self:center">Imprime en una sola hoja lo entregado: útiles de escritorio arriba y limpieza abajo. Deja el día vacío para todo el mes.</p>
-        </div>
         <div class="filtros">
           <label>Mes<input type="month" id="sMes"></label>
           <label>Tipo<select id="sTipo"><option value="SALIDA">Salidas (con lo no atendido)</option><option value="NOAT">Solo lo no atendido</option><option value="AJUSTE">Ajustes</option><option value="">Salidas y ajustes</option></select></label>
           <label class="crece">Buscar<input type="search" id="sBuscar" placeholder="Producto, destino, persona o motivo"></label>
         </div>
         <div class="resumen" id="sRes"></div>
-        <div class="tabla"><table><thead><tr><th>Fecha</th><th>Código</th><th>Producto</th><th class="num">Cantidad</th><th>Destino / área</th><th>Entregado a</th><th>Motivo / documento</th><th>Observación</th><th class="num">Costo total</th><th>Registró</th><th></th></tr></thead><tbody id="sFilas"><tr><td colspan="11" class="vacio">Cargando…</td></tr></tbody></table></div>
+        <div class="tabla" id="sFilas"><div class="vacio">Cargando…</div></div>
       </section>
 
       <!-- RRHH -->
@@ -767,6 +769,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.24e"></script>
+<script type="module" src="app.js?v=2026.11.24f"></script>
 </body>
 </html>
