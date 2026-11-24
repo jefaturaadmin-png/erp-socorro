@@ -421,7 +421,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
       </section>
       <section id="m-inventario" class="mod" hidden>
         <div class="cab"><div><h2>Toma de inventario</h2><p class="nota">Cuadra el kardex con lo que hay en el almacén: <b>1)</b> escribe el conteo físico y, si quieres, el costo nuevo (aquí o en Excel), <b>2)</b> revisa las diferencias, <b>3)</b> pulsa “Registrar cuadre”: se crean los ajustes en el kardex.</p></div>
-          <div class="acc"><button class="btn sec" type="button" id="invXls">Descargar Excel para contar</button><button class="btn sec" type="button" id="invSubir">Subir conteo (Excel)</button><input type="file" id="invFile" accept=".xlsx,.xls" hidden><button class="btn sec" type="button" id="invUnir">Unir productos duplicados</button><button class="btn" type="button" id="invOk">Registrar cuadre</button></div></div>
+          <div class="acc"><button class="btn sec" type="button" id="invXls">Descargar Excel para contar</button><button class="btn sec" type="button" id="invSubir">Subir conteo (Excel)</button><input type="file" id="invFile" accept=".xlsx,.xls" hidden><button class="btn sec" type="button" id="invDup">Ver posibles duplicados</button><button class="btn sec" type="button" id="invUnir">Unir productos duplicados</button><button class="btn" type="button" id="invOk">Registrar cuadre</button></div></div>
         <div class="filtros">
           <label>Categoría<select id="invCat"></select></label>
           <label>Mostrar<select id="invVer"><option value="">Todos</option><option value="DIF">Con diferencia</option><option value="CONT">Ya contados</option><option value="SIN">Sin contar</option></select></label>
@@ -683,6 +683,18 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
   </form>
 </dialog>
 
+<!-- Diálogo: posibles duplicados -->
+<dialog id="dDup" class="dlg grande" aria-labelledby="dupTit">
+  <div style="display:flex;flex-direction:column;height:100%">
+    <div class="dlg-cab"><h2 id="dupTit">Posibles productos duplicados</h2>
+      <div class="acc"><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="dupTodos"> Mostrar también los poco probables</label><button type="button" class="btn sec" id="dupOcultos" title="Vuelve a mostrar los que marcaste como distintos">Mostrar descartados</button><button type="button" class="btn sec" id="dupCerrar">Cerrar</button></div></div>
+    <div class="dlg-cuerpo" style="flex:1;overflow:auto">
+      <div class="aviso" id="dupMsg"></div>
+      <div class="tabla"><table class="lst"><thead><tr><th>Coincidencia</th><th>Producto A</th><th>Producto B</th><th></th></tr></thead><tbody id="dupFilas"></tbody></table></div>
+    </div>
+  </div>
+</dialog>
+
 <!-- Diálogo: unir productos duplicados -->
 <dialog id="dUnir" class="dlg medio" aria-labelledby="unTit">
   <form id="fUnir">
@@ -746,6 +758,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.24b"></script>
+<script type="module" src="app.js?v=2026.11.24c"></script>
 </body>
 </html>

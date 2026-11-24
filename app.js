@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.24b'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.24c'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -2094,6 +2094,84 @@ $('invOk').addEventListener('click', async e => {
   } catch (err) { toast(errorTexto(err), true); }
   ocupado(b, false);
 });
+
+// Detector de posibles duplicados: compara los nombres de los productos (sin tildes, plurales ni palabras de relleno)
+const DUP_RELLENO = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'para', 'con', 'x', 'y', 'por', 'en', 'un', 'una']);
+const DUP_TAMANO = /^(grande|pequeno|pequena|mediano|mediana|chico|chica|mini|jumbo|doble|simple|xl|l|m|s|delgado|delgada|grueso|gruesa|fino|fina|negro|negra|azul|rojo|roja|verde|amarillo|amarilla|blanco|blanca|color)$/;
+const tokensDup = n => norm(n).replace(/[^a-z0-9.]+/g, ' ').split(' ').filter(Boolean).filter(t => !DUP_RELLENO.has(t))
+  .map(t => t.length > 4 && t.endsWith('es') && !/[aeiou]es$/.test(t.slice(-3)) ? t.slice(0, -2) : t.length > 3 && t.endsWith('s') ? t.slice(0, -1) : t);
+function levenshtein(a, b) {
+  const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+// devuelve { nivel: 3 alta, 2 media, 1 baja, motivo } o null
+function parecidoDup(a, b) {
+  const ta = tokensDup(a.nombre), tb = tokensDup(b.nombre); if (!ta.length || !tb.length) return null;
+  const A = new Set(ta), B = new Set(tb), inter = [...A].filter(t => B.has(t)).length, union = new Set([...A, ...B]).size;
+  const soloA = [...A].filter(t => !B.has(t)), soloB = [...B].filter(t => !A.has(t)), extra = [...soloA, ...soloB];
+  const numA = soloA.filter(t => /\d/.test(t)), numB = soloB.filter(t => /\d/.test(t));
+  const medidasDistintas = numA.length && numB.length; // ej. 3 OZ y 1.5 OZ
+  const tamanos = extra.filter(t => DUP_TAMANO.test(t));
+  if (!extra.length) return { nivel: 3, motivo: 'Mismo nombre (cambia solo la forma de escribirlo)' };
+  const lev = levenshtein(ta.join(' '), tb.join(' ')), largo = Math.max(ta.join(' ').length, tb.join(' ').length), ratio = 1 - lev / largo;
+  if (ratio >= 0.9 && !medidasDistintas) return { nivel: 3, motivo: 'Nombre casi igual (posible error de escritura)' };
+  if (!soloA.length || !soloB.length) { // uno contiene al otro
+    const mas = soloA.length ? soloA : soloB;
+    if (tamanos.length) return { nivel: 2, motivo: `Uno dice además “${mas.join(' ').toUpperCase()}”: revisa si es otro tamaño o color` };
+    return { nivel: 2, motivo: `Uno agrega “${mas.join(' ').toUpperCase()}” al nombre` };
+  }
+  if (medidasDistintas) return inter / union >= 0.5 ? { nivel: 1, motivo: 'Mismo producto con medidas distintas: probablemente son diferentes' } : null;
+  if (soloA.some(t => DUP_TAMANO.test(t)) && soloB.some(t => DUP_TAMANO.test(t))) return inter / union >= 0.5 ? { nivel: 1, motivo: `Variantes distintas (${soloA.join(' ').toUpperCase()} / ${soloB.join(' ').toUpperCase()}): probablemente son diferentes` } : null;
+  if (inter / union >= 0.6 || ratio >= 0.8) return { nivel: 2, motivo: 'Nombres muy parecidos' };
+  return null;
+}
+const DUP_DESC = (() => { try { return new Set(JSON.parse(localStorage.getItem('dup-descartados') || '[]')); } catch (e) { return new Set(); } })();
+const claveDup = (a, b) => [a.id, b.id].sort().join('|');
+let DUP_VER_DESC = false;
+function buscarDuplicados() {
+  const l = [...PRODUCTOS.values()], pares = [];
+  for (let i = 0; i < l.length; i++) for (let j = i + 1; j < l.length; j++) {
+    const r = parecidoDup(l[i], l[j]); if (!r) continue;
+    const [a, b] = [l[i], l[j]].sort((x, y) => x.codigo.localeCompare(y.codigo)); // A = el código más antiguo
+    pares.push({ a, b, ...r, desc: DUP_DESC.has(claveDup(a, b)) });
+  }
+  return pares.sort((x, y) => y.nivel - x.nivel || x.a.nombre.localeCompare(y.a.nombre, 'es'));
+}
+function pintarDuplicados() {
+  const todos = buscarDuplicados(), ver = todos.filter(p => (DUP_VER_DESC || !p.desc) && ($('dupTodos').checked || p.nivel >= 2));
+  const nAlta = todos.filter(p => !p.desc && p.nivel === 3).length, nMedia = todos.filter(p => !p.desc && p.nivel === 2).length;
+  $('dupMsg').innerHTML = `Se revisaron <b>${PRODUCTOS.size}</b> productos. <b>${nAlta}</b> pares muy probables y <b>${nMedia}</b> para revisar. Revisa cada par: si es el mismo material, pulsa <b>Unir</b> (pasa todo el kardex al de la izquierda). Si son distintos, pulsa <b>No es duplicado</b> y no volverá a aparecer.`;
+  const ficha = p => `<b>${esc(p.codigo)}</b> · ${esc(p.nombre)}<span class="sub">${esc(p.unidad)} · stock ${nq(p.stock)} · S/ ${n2(p.valor)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</span>`;
+  const etiq = { 3: '<span class="estado no">MUY PROBABLE</span>', 2: '<span class="estado am">REVISAR</span>', 1: '<span class="estado gr">POCO PROBABLE</span>' };
+  $('dupFilas').innerHTML = ver.length ? ver.map(p => `<tr style="cursor:default"${p.desc ? ' class="anulado"' : ''}><td>${etiq[p.nivel]}<span class="sub">${esc(p.motivo)}</span>${p.a.unidad !== p.b.unidad ? '<span class="sub" style="color:var(--rojo)">Unidades distintas</span>' : ''}</td>
+      <td>${ficha(p.a)}</td><td>${ficha(p.b)}</td>
+      <td><div class="acciones"><button class="btn chico" type="button" data-dupunir="${esc(p.a.id)}|${esc(p.b.id)}" title="Pasa todo el kardex de ${esc(p.b.codigo)} a ${esc(p.a.codigo)}">Unir</button><button class="btn sec chico" type="button" data-dupinv="${esc(p.a.id)}|${esc(p.b.id)}" title="Unir al revés: se queda ${esc(p.b.codigo)}">⇄</button><button class="btn sec chico" type="button" data-dupno="${esc(claveDup(p.a, p.b))}">${p.desc ? 'Volver a mostrar' : 'No es duplicado'}</button></div></td></tr>`).join('')
+    : '<tr><td colspan="4" class="vacio">No se encontraron productos duplicados. ✔</td></tr>';
+}
+$('invDup').addEventListener('click', () => { DUP_VER_DESC = false; $('dupTodos').checked = false; pintarDuplicados(); $('dDup').showModal(); });
+$('dupCerrar').addEventListener('click', () => $('dDup').close());
+$('dupTodos').addEventListener('change', pintarDuplicados);
+$('dupOcultos').addEventListener('click', () => { DUP_VER_DESC = !DUP_VER_DESC; $('dupOcultos').textContent = DUP_VER_DESC ? 'Ocultar descartados' : 'Mostrar descartados'; pintarDuplicados(); });
+$('dupFilas').addEventListener('click', e => {
+  const u = e.target.closest('[data-dupunir],[data-dupinv]'), no = e.target.closest('[data-dupno]');
+  if (no) {
+    const k = no.dataset.dupno; if (DUP_DESC.has(k)) DUP_DESC.delete(k); else DUP_DESC.add(k);
+    try { localStorage.setItem('dup-descartados', JSON.stringify([...DUP_DESC])); } catch (err) { }
+    return pintarDuplicados();
+  }
+  if (u) {
+    let [ida, idb] = (u.dataset.dupunir || u.dataset.dupinv).split('|'); if (u.dataset.dupinv) [ida, idb] = [idb, ida];
+    const a = PRODUCTOS.get(ida), b = PRODUCTOS.get(idb); if (!a || !b) return;
+    $('dDup').close();
+    $('fUnir').reset(); $('unMsg').textContent = '';
+    $('unA').value = etiquetaProd(a); $('unB').value = etiquetaProd(b); $('unA').dispatchEvent(new Event('input'));
+    DUP_REABRIR = true; $('dUnir').showModal();
+  }
+});
+let DUP_REABRIR = false; // al terminar de unir (o cancelar) se vuelve a la lista de duplicados
+$('dUnir').addEventListener('close', () => { if (DUP_REABRIR) { DUP_REABRIR = false; setTimeout(() => { pintarDuplicados(); $('dDup').showModal(); }, 300); } });
 
 // Unir productos duplicados: todo el kardex del duplicado pasa al que se queda
 $('invUnir').addEventListener('click', () => { $('fUnir').reset(); $('unInfo').textContent = ''; $('unMsg').textContent = ''; $('dUnir').showModal(); });
