@@ -54,6 +54,11 @@ input[readonly]:focus{outline:none;border-color:var(--borde)}
 .sug b{color:var(--pri)}
 .sug .vacia{color:var(--gris);cursor:default;font-style:italic}
 .sug .vacia:hover{background:none}
+.sug .otro{border-top:1px dashed var(--borde);color:#1d4f73}
+.sug .otro b{color:#1d4f73}
+.tag{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:bold;letter-spacing:.3px;color:#1d4f73;background:#e8f2fa;border-radius:4px;padding:1px 6px}
+.tag[hidden]{display:none}
+input.inval{border-color:var(--rojo);background:var(--rojo-f)}
 .bloque{border:1px solid var(--borde);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
 .bloque[data-tipo="ESCRITORIO"]{border-left:5px solid var(--pri)}
 .bloque[data-tipo="LIMPIEZA"]{border-left:5px solid #2f7fb8}
@@ -90,6 +95,6 @@ input[readonly]:focus{outline:none;border-color:var(--borde)}
     <div class="acc"><p class="nota">Administración revisará tu pedido y te avisará cuando esté listo para entregar.</p><button type="submit" class="btn" id="sEnviar">Enviar solicitud</button></div>
   </form>
 </main>
-<script type="module" src="solicitud.js?v=2026.11.19b"></script>
+<script type="module" src="solicitud.js?v=2026.11.24e"></script>
 </body>
 </html>
