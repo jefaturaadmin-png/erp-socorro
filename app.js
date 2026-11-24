@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.24c'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.24d'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -484,6 +484,56 @@ function buscarProd(txt) {
   for (const p of PRODUCTOS.values()) if (norm(etiquetaProd(p)) === t || norm(p.nombre) === t || norm(p.codigo) === t) return p;
   return null;
 }
+
+/* Buscador de productos: al escribir aparecen los que coinciden (código o nombre, cualquier palabra), con su stock.
+   Sirve para cualquier campo con data-bp; reemplaza a la lista desplegable del navegador. */
+const BP = { el: null, inp: null, ops: [], act: -1 };
+BP.el = document.createElement('div'); BP.el.className = 'bp'; BP.el.hidden = true; BP.el.setAttribute('role', 'listbox');
+function cerrarBP() { BP.el.hidden = true; BP.inp = null; BP.ops = []; BP.act = -1; }
+function marcarBP(txt, palabras) {
+  const nn = norm(txt); if (nn.length !== txt.length) return esc(txt);
+  const on = Array(txt.length).fill(false);
+  palabras.forEach(w => { let i = nn.indexOf(w); while (i >= 0) { for (let k = i; k < i + w.length; k++) on[k] = true; i = nn.indexOf(w, i + w.length); } });
+  let h = '', ab = false;
+  for (let k = 0; k < txt.length; k++) { if (on[k] !== ab) { h += ab ? '</b>' : '<b>'; ab = on[k]; } h += esc(txt[k]); }
+  return h + (ab ? '</b>' : '');
+}
+function abrirBP(inp) {
+  if (BP.silencio) return;
+  const t = norm(inp.value.replace(/·/g, ' ')), palabras = t.split(' ').filter(Boolean);
+  const todos = [...PRODUCTOS.values()];
+  if (palabras.length && buscarProd(inp.value)) return cerrarBP(); // ya está elegido
+  const ops = (palabras.length ? todos.filter(p => { const n = norm(p.codigo + ' ' + p.nombre); return palabras.every(w => n.includes(w)); }) : todos)
+    .sort((a, b) => (norm(b.nombre).startsWith(t) - norm(a.nombre).startsWith(t)) || a.nombre.localeCompare(b.nombre, 'es')).slice(0, 12);
+  Object.assign(BP, { inp, ops, act: ops.length ? 0 : -1 });
+  BP.el.innerHTML = ops.length ? ops.map((p, i) => `<div role="option" data-i="${i}" class="${i === BP.act ? 'act' : ''}"><span class="cod">${marcarBP(p.codigo, palabras)}</span><span class="nom">${marcarBP(p.nombre, palabras)}</span><span class="stk${p.stock > 0 ? '' : ' cero'}">${nq(p.stock)} ${esc(p.unidad || '')}</span></div>`).join('')
+    : `<div class="vacia">${inp.dataset.bp === 'libre' ? 'No está en el kardex: se creará como producto nuevo' : 'Ningún material coincide'}</div>`;
+  (inp.closest('dialog') || document.body).appendChild(BP.el); // dentro del diálogo para que se vea encima
+  const r = inp.getBoundingClientRect(), abajo = window.innerHeight - r.bottom;
+  Object.assign(BP.el.style, { left: r.left + 'px', width: Math.max(r.width, 360) + 'px', top: abajo > 260 || abajo > r.top ? (r.bottom + 3) + 'px' : 'auto', bottom: abajo > 260 || abajo > r.top ? 'auto' : (window.innerHeight - r.top + 3) + 'px' });
+  BP.el.hidden = false;
+}
+function elegirBP(i) {
+  const p = BP.ops[i], inp = BP.inp; if (!p || !inp) return;
+  inp.value = etiquetaProd(p); cerrarBP();
+  BP.silencio = true; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); BP.silencio = false;
+}
+document.addEventListener('input', e => { if (e.target.matches?.('input[data-bp]')) abrirBP(e.target); });
+document.addEventListener('focusin', e => { if (e.target.matches?.('input[data-bp]')) { if (!e.target.value) abrirBP(e.target); } else if (BP.inp && !BP.el.contains(e.target)) cerrarBP(); });
+document.addEventListener('focusout', e => { if (e.target === BP.inp) setTimeout(() => { if (BP.inp === e.target && document.activeElement !== e.target) cerrarBP(); }, 150); });
+document.addEventListener('keydown', e => {
+  if (BP.el.hidden || e.target !== BP.inp) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); return cerrarBP(); }
+  if (!BP.ops.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); e.stopPropagation();
+    BP.act = (BP.act + (e.key === 'ArrowDown' ? 1 : -1) + BP.ops.length) % BP.ops.length;
+    [...BP.el.children].forEach((d, i) => d.classList.toggle('act', i === BP.act)); BP.el.children[BP.act]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter' && BP.act >= 0) { e.preventDefault(); e.stopPropagation(); elegirBP(BP.act); }
+}, true);
+BP.el.addEventListener('mousedown', e => { e.preventDefault(); const d = e.target.closest('[data-i]'); if (d) elegirBP(+d.dataset.i); });
+window.addEventListener('resize', cerrarBP);
+document.addEventListener('scroll', e => { if (BP.inp && !BP.el.contains(e.target)) cerrarBP(); }, true);
 const CAMPOS_BLOQ_EDIT = ['cTipo', 'cSerie', 'cNum', 'cRuc'];
 const CAMPOS = ['cTipo', 'cSerie', 'cNum', 'cFecha', 'cRuc', 'cRazon', 'cCond', 'cVence', 'cForma', 'cMoneda', 'cGasto', 'cCentro', 'cIgv', 'cCont', 'cDet', 'cDetPct', 'cRet', 'cRetPct', 'cEmpresa', 'cDestino', 'cSol', 'cNotas'];
 
@@ -619,7 +669,7 @@ function pintarLineas() {
   $('cLineas').innerHTML = ED.lineas.map((l, i) => {
     const c = calcLinea(l);
     return `<tr data-i="${i}"><td class="c">${i + 1}</td>
-      <td class="ancho"><input data-f="desc" value="${esc(l.desc)}"${compra ? ' list="dlProd"' : ''}${dis} aria-label="${compra ? 'Producto' : 'Concepto'}"><span data-c="marca">${marcaProd(l)}</span></td>
+      <td class="ancho"><input data-f="desc" value="${esc(l.desc)}"${compra ? ' data-bp="libre" autocomplete="off"' : ''}${dis} aria-label="${compra ? 'Producto' : 'Concepto'}"><span data-c="marca">${marcaProd(l)}</span></td>
       ${compra ? `<td><input class="w6" data-f="unidad" list="dlUni" value="${esc(l.unidad || 'UND')}"${dis} aria-label="Unidad"></td>` : ''}
       <td><input class="w6 num" type="number" step="any" min="0" data-f="cant" value="${l.cant}"${dis} aria-label="Cantidad"></td>
       <td><input class="w8 num" type="number" step="any" min="0" data-f="vu" value="${l.vu}"${dis} aria-label="Precio unitario sin IGV"></td>
@@ -1719,7 +1769,7 @@ function pintarLineasSol() {
       const no = !(Number(l.entregar) > 0), parcial = !no && Number(l.entregar) < Number(l.cantSol);
       const id = `${pi}-${i}`;
       return `<tr data-i="${id}" class="${no ? 'sol-no' : parcial ? 'sol-parcial' : ''}"><td class="c">${i + 1}</td><td>${esc(l.desc)}</td><td class="num">${nq(l.cantSol)} <small class="nota">${esc(l.unidadSol)}</small></td>
-        <td><input data-f="prod" list="dlProd" value="${p ? esc(etiquetaProd(p)) : ''}" placeholder="Elegir material del kardex"${dis} aria-label="Material del kardex para la línea ${i + 1}" style="min-width:240px"></td>
+        <td><input data-f="prod" data-bp autocomplete="off" value=""${p ? esc(etiquetaProd(p)) : ''}" placeholder="Elegir material del kardex"${dis} aria-label="Material del kardex para la línea ${i + 1}" style="min-width:240px"></td>
         <td class="num"${falta ? ' style="color:var(--rojo);font-weight:bold" title="No alcanza el stock"' : ''}>${p ? nq(p.stock) + ' ' + esc(p.unidad) : '—'}</td>
         <td class="num"><input class="w6 num" type="number" min="0" step="any" data-f="cant" value="${l.entregar}"${dis} aria-label="Cantidad a entregar en la línea ${i + 1}"></td>
         <td>${SOL.editable ? `<input data-f="obs" list="dlObs" maxlength="120" value="${esc(l.obs || '')}" class="${no && !limpio(l.obs) ? 'obs-req' : ''}" placeholder="${no ? '¿Por qué no se entrega?' : parcial ? '¿Por qué se entrega menos?' : 'Opcional'}" aria-label="Observación de la línea ${i + 1}" style="min-width:190px">`
