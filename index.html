@@ -420,7 +420,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
         <div class="md" id="solMD"><div class="md-lista" id="solFilas"><div class="vacio">Cargando…</div></div><div class="md-det" id="solDet"><div class="vacio">Elige una solicitud de la lista para verla.</div></div></div>
       </section>
       <section id="m-inventario" class="mod" hidden>
-        <div class="cab"><div><h2>Toma de inventario</h2><p class="nota">Cuadra el kardex con lo que hay en el almacén: <b>1)</b> escribe el conteo físico (aquí o en Excel), <b>2)</b> revisa las diferencias, <b>3)</b> pulsa “Registrar cuadre”: se crean los ajustes en el kardex.</p></div>
+        <div class="cab"><div><h2>Toma de inventario</h2><p class="nota">Cuadra el kardex con lo que hay en el almacén: <b>1)</b> escribe el conteo físico y, si quieres, el costo nuevo (aquí o en Excel), <b>2)</b> revisa las diferencias, <b>3)</b> pulsa “Registrar cuadre”: se crean los ajustes en el kardex.</p></div>
           <div class="acc"><button class="btn sec" type="button" id="invXls">Descargar Excel para contar</button><button class="btn sec" type="button" id="invSubir">Subir conteo (Excel)</button><input type="file" id="invFile" accept=".xlsx,.xls" hidden><button class="btn sec" type="button" id="invUnir">Unir productos duplicados</button><button class="btn" type="button" id="invOk">Registrar cuadre</button></div></div>
         <div class="filtros">
           <label>Categoría<select id="invCat"></select></label>
@@ -430,7 +430,7 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
           <button class="btn sec" type="button" id="invLimpiar" title="Borra todo el conteo escrito">Limpiar conteo</button>
         </div>
         <div class="resumen" id="invRes"></div>
-        <div class="tabla"><table class="lst"><thead><tr><th>Código</th><th>Material</th><th class="num">Stock sistema</th><th class="num">Conteo físico</th><th class="num">Diferencia</th><th class="num">Costo prom.</th><th class="num">Valor dif. (S/)</th></tr></thead><tbody id="invFilas"></tbody></table></div>
+        <div class="tabla"><table class="lst"><thead><tr><th>Código</th><th>Material</th><th class="num">Stock sistema</th><th class="num">Conteo físico</th><th class="num">Diferencia</th><th class="num">Costo actual</th><th class="num" title="Opcional: si lo dejas vacío se usa el costo actual (o el de la última compra)">Costo nuevo (opcional)</th><th class="num">Valor dif. (S/)</th></tr></thead><tbody id="invFilas"></tbody></table></div>
       </section>
       <section id="m-salidas" class="mod" hidden>
         <div class="cab"><div><h2>Salida de materiales</h2><p class="nota">Entregas a cada área o centro de costos. Cada salida descuenta el stock del kardex a costo promedio.</p></div>
@@ -746,6 +746,6 @@ table.lineas .x{background:none;border:0;color:var(--rojo);font-size:17px;cursor
 <datalist id="dlCargos"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="app.js?v=2026.11.24a"></script>
+<script type="module" src="app.js?v=2026.11.24b"></script>
 </body>
 </html>
