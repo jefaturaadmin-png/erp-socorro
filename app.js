@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.19b'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.24a'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -23,6 +23,7 @@ const MODULOS = [
   { id: 'compras', nombre: 'Ingreso de materiales', grupo: 'Administración' },
   { id: 'salidas', nombre: 'Salida de materiales', grupo: 'Administración' },
   { id: 'kardex', nombre: 'Kardex', grupo: 'Administración' },
+  { id: 'inventario', nombre: 'Toma de inventario', grupo: 'Administración' },
   { id: 'rrhh', nombre: 'Personal', grupo: 'RR. HH.' },
   { id: 'cargo', nombre: 'Cargo de útiles', grupo: 'RR. HH.' },
   { id: 'usuarios', nombre: 'Usuarios', grupo: 'Sistema' },
@@ -180,6 +181,7 @@ async function cargarBase() {
     PRODUCTOS.clear(); s.forEach(d => PRODUCTOS.set(d.id, { id: d.id, ...d.data() }));
     $('dlProd').innerHTML = [...PRODUCTOS.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(p => `<option value="${esc(etiquetaProd(p))}">`).join('');
     if (modActual === 'kardex') pintarKardex();
+    if (modActual === 'inventario' && !$('invFilas').contains(document.activeElement)) pintarInventario();
     sincronizarCatalogo(); // nombres de materiales para la página pública de solicitudes
   }, e => console.warn('productos', e));
 }
@@ -235,6 +237,7 @@ const ICO = {
   rrhh: SVG('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>'),
   cargo: SVG('<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/>'),
   usuarios: SVG('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+  inventario: SVG('<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>'),
   config: SVG('<circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>')
 };
 ICO.salidas = ICO.camion;
@@ -256,7 +259,7 @@ function irA(id) {
   document.querySelectorAll('.mod').forEach(s => s.hidden = s.id !== 'm-' + id);
   document.querySelectorAll('#menu [data-mod]').forEach(b => b.classList.toggle('act', b.dataset.mod === id));
   history.replaceState(null, '', '#' + id);
-  ({ inicio: abrirInicio, solicitudes: abrirSolicitudes, servicios: () => abrirComps('SERVICIO'), compras: () => abrirComps('COMPRA'), salidas: abrirSalidas, kardex: abrirKardex, rrhh: abrirRRHH, cargo: abrirCargo, usuarios: abrirUsuarios, config: abrirConfig })[id]();
+  ({ inicio: abrirInicio, solicitudes: abrirSolicitudes, servicios: () => abrirComps('SERVICIO'), compras: () => abrirComps('COMPRA'), salidas: abrirSalidas, kardex: abrirKardex, inventario: abrirInventario, rrhh: abrirRRHH, cargo: abrirCargo, usuarios: abrirUsuarios, config: abrirConfig })[id]();
 }
 
 /* ================= Inicio ================= */
@@ -1916,6 +1919,174 @@ function imprimirSucursalUnaHoja(nombreSuc, l) {
   w.document.close();
 }
 function imprimirSolicitud(x, borrador) { if (x) abrirImpresion(`Solicitud N.º ${x.numero}`, [htmlFormato(x, borrador)]); }
+
+/* ================= Toma de inventario: cuadrar el kardex con el conteo físico ================= */
+// El conteo escrito se guarda en este navegador para poder seguir otro día; al registrar se crean ajustes AJUSTE+ / AJUSTE-
+const INV = { conteo: {} };
+try { INV.conteo = JSON.parse(localStorage.getItem('inv-conteo') || '{}') || {}; } catch (e) { INV.conteo = {}; }
+const guardarConteo = () => { try { localStorage.setItem('inv-conteo', JSON.stringify(INV.conteo)); } catch (e) { } };
+const difInv = p => INV.conteo[p.id] === undefined ? null : r4(INV.conteo[p.id] - (p.stock || 0));
+function abrirInventario() {
+  const cats = [...new Set([...PRODUCTOS.values()].map(p => p.categoria || 'SIN CATEGORÍA'))].sort();
+  const ant = $('invCat').value;
+  $('invCat').innerHTML = '<option value="">Todas</option>' + cats.map(c => `<option>${esc(c)}</option>`).join('');
+  $('invCat').value = cats.includes(ant) ? ant : '';
+  if (!$('invFecha').value) $('invFecha').value = hoyISO();
+  pintarInventario();
+}
+function filtrarInventario() {
+  const cat = $('invCat').value, ver = $('invVer').value, q = norm($('invQ').value);
+  return [...PRODUCTOS.values()].filter(p => (!cat || (p.categoria || 'SIN CATEGORÍA') === cat) && (!q || norm(p.codigo + ' ' + p.nombre).includes(q))
+    && (!ver || (ver === 'DIF' ? Math.abs(difInv(p) || 0) > 1e-9 : ver === 'CONT' ? INV.conteo[p.id] !== undefined : INV.conteo[p.id] === undefined)))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+function resumenInventario() {
+  const todos = [...PRODUCTOS.values()], cont = todos.filter(p => INV.conteo[p.id] !== undefined), dif = cont.filter(p => Math.abs(difInv(p)) > 1e-9);
+  const val = dif.reduce((a, p) => a + difInv(p) * (p.cProm || 0), 0);
+  $('invRes').innerHTML = `<span>Contados: <b>${cont.length}</b> de ${todos.length}</span><span>Con diferencia: <b style="color:${dif.length ? 'var(--rojo)' : 'var(--ok)'}">${dif.length}</b></span><span>Sobrantes: <b>${dif.filter(p => difInv(p) > 0).length}</b> · Faltantes: <b>${dif.filter(p => difInv(p) < 0).length}</b></span><span>Valor de la diferencia: <b>S/ ${n2(val)}</b></span>`;
+}
+function pintarInventario() {
+  const l = filtrarInventario();
+  $('invFilas').innerHTML = l.length ? l.map(p => {
+    const d = difInv(p), c = INV.conteo[p.id];
+    return `<tr data-pid="${esc(p.id)}"${d && Math.abs(d) > 1e-9 ? ` class="${d < 0 ? 'sol-no' : 'sol-parcial'}"` : ''}><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}<span class="sub">${esc(p.unidad)}${p.categoria ? ' · ' + esc(p.categoria) : ''}</span></td>
+      <td class="num">${nq(p.stock)}</td>
+      <td class="num"><input class="w6 num" type="number" min="0" step="any" inputmode="decimal" data-inv="${esc(p.id)}" value="${c === undefined ? '' : c}" placeholder="—" aria-label="Conteo físico de ${esc(p.nombre)}" style="max-width:110px"></td>
+      <td class="num" data-c="dif">${d === null ? '' : `<b style="color:${Math.abs(d) < 1e-9 ? 'var(--ok)' : d < 0 ? 'var(--rojo)' : 'var(--ambar)'}">${Math.abs(d) < 1e-9 ? 'OK' : (d > 0 ? '+' : '') + nq(d)}</b>`}</td>
+      <td class="num">${n2(p.cProm)}</td><td class="num" data-c="val">${d === null || Math.abs(d) < 1e-9 ? '' : n2(d * (p.cProm || 0))}</td></tr>`;
+  }).join('') : '<tr><td colspan="7" class="vacio">No hay materiales con este filtro.</td></tr>';
+  resumenInventario();
+}
+['invCat', 'invVer'].forEach(id => $(id).addEventListener('change', pintarInventario));
+$('invQ').addEventListener('input', pintarInventario);
+// escribir el conteo: actualiza la diferencia de esa fila sin repintar toda la tabla
+$('invFilas').addEventListener('input', e => {
+  const i = e.target.closest('[data-inv]'); if (!i) return;
+  const p = PRODUCTOS.get(i.dataset.inv); if (!p) return;
+  if (i.value === '') delete INV.conteo[p.id]; else INV.conteo[p.id] = r4(Math.max(0, num(i.value)));
+  guardarConteo();
+  const tr = i.closest('tr'), d = difInv(p);
+  tr.className = d && Math.abs(d) > 1e-9 ? (d < 0 ? 'sol-no' : 'sol-parcial') : '';
+  tr.querySelector('[data-c="dif"]').innerHTML = d === null ? '' : `<b style="color:${Math.abs(d) < 1e-9 ? 'var(--ok)' : d < 0 ? 'var(--rojo)' : 'var(--ambar)'}">${Math.abs(d) < 1e-9 ? 'OK' : (d > 0 ? '+' : '') + nq(d)}</b>`;
+  tr.querySelector('[data-c="val"]').textContent = d === null || Math.abs(d) < 1e-9 ? '' : n2(d * (p.cProm || 0));
+  resumenInventario();
+});
+// ↑ ↓ y Enter pasan al conteo de la fila de arriba o de abajo, como en Excel
+$('invFilas').addEventListener('keydown', e => {
+  const i = e.target.closest('[data-inv]'); if (!i || !['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return;
+  e.preventDefault();
+  const tods = [...$('invFilas').querySelectorAll('[data-inv]')], k = tods.indexOf(i) + (e.key === 'ArrowUp' ? -1 : 1);
+  if (tods[k]) { tods[k].focus(); tods[k].select(); }
+});
+$('invLimpiar').addEventListener('click', () => {
+  if (!Object.keys(INV.conteo).length) return toast('No hay conteo escrito.');
+  if (!confirm('¿Borrar todo el conteo escrito? (no cambia el kardex)')) return;
+  INV.conteo = {}; guardarConteo(); pintarInventario();
+});
+// Excel para contar a mano en el almacén y luego subirlo
+$('invXls').addEventListener('click', async e => {
+  const b = e.currentTarget; ocupado(b, true, 'Preparando…');
+  try {
+    const X = await libroXlsx(), l = filtrarInventario();
+    const filas = [[`TOMA DE INVENTARIO · ${fmtF($('invFecha').value || hoyISO())}`], ['Escribe lo que cuentas en la columna “Conteo físico” y súbelo con “Subir conteo (Excel)”. No cambies la columna Código.'], [],
+      ['Código', 'Material', 'Unidad', 'Categoría', 'Stock sistema', 'Conteo físico', 'Observación']];
+    l.forEach(p => filas.push([p.codigo, p.nombre, p.unidad, p.categoria || '', p.stock, INV.conteo[p.id] ?? '', '']));
+    const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, hojaXlsx(X, filas, [10, 42, 10, 22, 13, 14, 30]), 'Conteo');
+    X.writeFile(wb, `toma_inventario_${$('invFecha').value || hoyISO()}.xlsx`);
+  } catch (err) { toast(errorTexto(err), true); }
+  ocupado(b, false);
+});
+$('invSubir').addEventListener('click', () => $('invFile').click());
+$('invFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const X = await libroXlsx(), wb = X.read(await f.arrayBuffer(), { type: 'array' });
+    const filas = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null });
+    const h = filas.findIndex(r => (r || []).some(v => norm(v) === 'codigo') && (r || []).some(v => /conteo/.test(norm(v))));
+    if (h < 0) throw new Error('No encontré las columnas “Código” y “Conteo físico”.');
+    const cCod = filas[h].findIndex(v => norm(v) === 'codigo'), cCon = filas[h].findIndex(v => /conteo/.test(norm(v)));
+    const porCod = new Map([...PRODUCTOS.values()].map(p => [norm(p.codigo), p]));
+    let n = 0, noEnc = 0;
+    filas.slice(h + 1).forEach(r => {
+      const cod = norm((r || [])[cCod]), v = (r || [])[cCon]; if (!cod || v === null || v === '') return;
+      const p = porCod.get(cod); if (!p) { noEnc++; return; }
+      INV.conteo[p.id] = r4(Math.max(0, num(v))); n++;
+    });
+    guardarConteo(); pintarInventario();
+    toast(`Conteo cargado: ${n} materiales.${noEnc ? ` ${noEnc} códigos no existen en el kardex.` : ''}`);
+  } catch (err) { toast('No se pudo leer el Excel: ' + errorTexto(err), true); }
+});
+// Registrar el cuadre: un ajuste por cada material con diferencia; el stock queda igual al conteo
+$('invOk').addEventListener('click', async e => {
+  const fecha = $('invFecha').value || hoyISO();
+  const l = [...PRODUCTOS.values()].filter(p => INV.conteo[p.id] !== undefined && Math.abs(difInv(p)) > 1e-9);
+  if (!l.length) return toast(Object.keys(INV.conteo).length ? 'Todo lo contado coincide con el sistema: no hay nada que ajustar.' : 'Primero escribe el conteo físico de los materiales.', true);
+  const mas = l.filter(p => difInv(p) > 0), menos = l.filter(p => difInv(p) < 0), val = l.reduce((a, p) => a + difInv(p) * (p.cProm || 0), 0);
+  const motivo = prompt(`Se ajustarán ${l.length} materiales al ${fmtF(fecha)}:\n• ${mas.length} sobrantes (ajuste +)\n• ${menos.length} faltantes (ajuste −)\nValor de la diferencia: S/ ${n2(val)}\n\nEscribe el motivo o nombre del inventario (se verá en el kardex):`, `TOMA DE INVENTARIO ${fmtF(fecha)}`);
+  if (motivo === null) return;
+  const b = e.currentTarget; ocupado(b, true, 'Registrando…');
+  try {
+    let lote = writeBatch(db), ops = 0, ms = Date.now(), hechos = 0;
+    for (const p of l) {
+      const d = difInv(p), q = Math.abs(d);
+      let cu = r4(p.cProm || 0);
+      if (d > 0 && !cu) { // sin costo promedio (stock en 0): se usa el último costo de entrada
+        const s = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', p.id)));
+        const ent = ordenarMovs(s.docs.map(x => x.data())).filter(m => esEntrada(m) && m.cu > 0).pop(); cu = r4(ent?.cu || 0);
+      }
+      const stock = r4(INV.conteo[p.id]);
+      const valor = stock <= 1e-9 ? 0 : d > 0 ? r2((p.valor || 0) + q * cu) : r2((p.valor || 0) - q * cu);
+      lote.set(doc(collection(db, 'movimientos')), {
+        productoId: p.id, codigo: p.codigo, producto: p.nombre, unidad: p.unidad, fecha, ms: ms++, tipo: 'AJUSTE', origen: d > 0 ? 'AJUSTE+' : 'AJUSTE-',
+        documento: limpio(motivo).toUpperCase() || 'TOMA DE INVENTARIO', tercero: '', cant: q, cu, ct: r2(q * cu),
+        saldoCant: stock, cProm: stock > 0 ? r4(valor / stock) : 0, saldoValor: Math.max(0, valor), usuario: YO.nombre, uid: YO.uid, creado: serverTimestamp()
+      });
+      ops++; if (ops >= 450) { await lote.commit(); lote = writeBatch(db); ops = 0; }
+      hechos++; b.textContent = `Registrando… ${hechos}/${l.length}`;
+    }
+    if (ops) await lote.commit();
+    // recalcula cada material en orden de fecha para que saldos y costo promedio queden exactos
+    let k = 0; for (const p of l) { await recalcularProducto(p.id); b.textContent = `Recalculando… ${++k}/${l.length}`; }
+    l.forEach(p => delete INV.conteo[p.id]); guardarConteo();
+    toast(`Cuadre registrado: ${l.length} materiales ajustados. El kardex ya coincide con el conteo.`);
+    pintarInventario();
+  } catch (err) { toast(errorTexto(err), true); }
+  ocupado(b, false);
+});
+
+// Unir productos duplicados: todo el kardex del duplicado pasa al que se queda
+$('invUnir').addEventListener('click', () => { $('fUnir').reset(); $('unInfo').textContent = ''; $('unMsg').textContent = ''; $('dUnir').showModal(); });
+$('unCerrar').addEventListener('click', () => $('dUnir').close());
+['unA', 'unB'].forEach(id => $(id).addEventListener('input', () => {
+  const a = buscarProd($('unA').value), b = buscarProd($('unB').value);
+  $('unInfo').innerHTML = [a && `Se queda: <b>${esc(a.codigo)} · ${esc(a.nombre)}</b> (${nq(a.stock)} ${esc(a.unidad)})`, b && `Se elimina: <b>${esc(b.codigo)} · ${esc(b.nombre)}</b> (${nq(b.stock)} ${esc(b.unidad)})`,
+    a && b && `Stock después de unir: <b>${nq((a.stock || 0) + (b.stock || 0))} ${esc(a.unidad)}</b>`, a && b && a.unidad !== b.unidad && `<span style="color:var(--rojo)">⚠ Tienen distinta unidad (${esc(a.unidad)} y ${esc(b.unidad)}). Únelos solo si es la misma presentación.</span>`].filter(Boolean).join('<br>');
+}));
+$('fUnir').addEventListener('submit', async e => {
+  e.preventDefault();
+  const a = buscarProd($('unA').value), b = buscarProd($('unB').value), msg = t => { $('unMsg').textContent = t; };
+  if (!a || !b) return msg('Elige los dos productos de la lista.');
+  if (a.id === b.id) return msg('Elige dos productos distintos.');
+  if (!confirm(`¿Unir ${b.codigo} · ${b.nombre} dentro de ${a.codigo} · ${a.nombre}?\n\nTodo su kardex pasará a ${a.codigo} y ${b.codigo} se eliminará. No se puede deshacer.`)) return;
+  const btn = e.submitter; ocupado(btn, true, 'Uniendo…'); msg('');
+  try {
+    const ms = await getDocs(query(collection(db, 'movimientos'), where('productoId', '==', b.id)));
+    let lote = writeBatch(db), n = 0;
+    for (const d of ms.docs) { lote.update(d.ref, { productoId: a.id, codigo: a.codigo, producto: a.nombre, unidad: a.unidad }); if (++n % 450 === 0) { await lote.commit(); lote = writeBatch(db); } }
+    if (n % 450) await lote.commit();
+    // facturas de compra que tenían el duplicado
+    const cs = await getDocs(query(collection(db, 'comprobantes'), where('clase', '==', 'COMPRA')));
+    for (const c of cs.docs) {
+      const lin = c.data().lineas || [];
+      if (lin.some(l => l.prodId === b.id)) await updateDoc(c.ref, { lineas: lin.map(l => l.prodId === b.id ? { ...l, prodId: a.id, codigo: a.codigo } : l) });
+    }
+    await recalcularProducto(a.id);
+    await deleteDoc(doc(db, 'productos', b.id));
+    $('dUnir').close(); toast(`${b.codigo} se unió a ${a.codigo}: ${n} movimientos pasaron a ${a.nombre}.`);
+    delete INV.conteo[b.id]; guardarConteo();
+  } catch (err) { msg(errorTexto(err)); }
+  ocupado(btn, false);
+});
 
 /* ================= Salida de materiales (módulo aparte; el kardex solo se consulta) ================= */
 const SAL = { lista: [] };
