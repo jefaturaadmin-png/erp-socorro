@@ -11,7 +11,7 @@ const DOMINIO = '@erp-socorro.example.com'; // los usuarios solo escriben su nom
 const SHEET_UNIFORMES = '1VG8CztNg3nO1oB1tIUCTnVIEm0_qPuwUVl7hoVF9WWA';
 const IGV = 0.18;
 const MODELO_IA = 'gemini-3.8-flash'; // modelo vigente de Google Gemini
-const VERSION = '2026.11.24e'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
+const VERSION = '2026.11.24f'; // cambiarla también en index.html (app.js?v=...) para que los navegadores no usen la copia vieja
 const MODELOS_RETIRADOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
 const ROLES = ['ADMIN', 'LOGISTICA', 'COMPRAS', 'ALMACEN', 'RRHH', 'GERENCIA', 'CONSULTA'];
 // El rol LOGISTICA se guarda con ese nombre (usuarios y reglas ya creados), pero se muestra como ADMINISTRACION
@@ -2258,64 +2258,83 @@ $('fUnir').addEventListener('submit', async e => {
 });
 
 /* ================= Salida de materiales (módulo aparte; el kardex solo se consulta) ================= */
-const SAL = { lista: [] };
+const SAL = { lista: [], abiertos: new Set(), grupos: new Map() };
 function abrirSalidas() {
   $('sNueva').hidden = !puede('kardex');
   if (!$('sMes').value) $('sMes').value = mesISO();
-  const ant = $('sSuc').value;
-  $('sSuc').innerHTML = '<option value="">— Elegir sucursal —</option>' + (LISTAS.codigosCC || []).map(c => `<option value="${esc(c.codigo)}">${esc(c.codigo + (c.nombre ? ' · ' + c.nombre : ''))}</option>`).join('');
-  if (ant) $('sSuc').value = ant;
-  if (!$('sDia').value) $('sDia').value = hoyISO();
   cargarSalidas();
 }
 async function cargarSalidas() {
   const mes = $('sMes').value || mesISO();
-  $('sFilas').innerHTML = '<tr><td colspan="11" class="vacio">Cargando…</td></tr>';
+  $('sFilas').innerHTML = '<div class="vacio">Cargando…</div>';
   try {
     const [s, at] = await Promise.all([
       getDocs(query(collection(db, 'movimientos'), where('fecha', '>=', mes + '-01'), where('fecha', '<=', mes + '-31'))),
       getDocs(query(collection(db, 'solicitudes'), where('estado', '==', 'ATENDIDA'))).catch(() => ({ docs: [] }))
     ]);
     // lo que se pidió y no se entregó (con su observación), de las solicitudes atendidas este mes
+    const tipoDeSol = new Map(at.docs.map(d => [d.id, d.data().tipo === 'LIMPIEZA' ? 'LIMPIEZA' : 'ESCRITORIO']));
     const noAt = at.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => (x.fechaEntrega || '').startsWith(mes))
       .flatMap(x => (x.entrega || []).filter(i => !(i.cant > 0)).map((i, k) => ({
         id: `noat-${x.id}-${k}`, noAt: true, tipo: 'SALIDA', fecha: x.fechaEntrega, codigo: '', producto: i.desc, cant: 0, cantSol: i.cantSol, unidad: i.unidad || '',
-        tercero: x.centro, persona: x.recibidoPor || '', documento: `Solicitud N.º ${x.numero}`, solicitudId: x.id, obs: i.obs || '', ct: 0, usuario: x.atendidoPor || '', ms: x.atendidoMs || 0
+        tercero: x.centro, persona: x.recibidoPor || '', documento: `Solicitud N.º ${x.numero}`, solicitudId: x.id, obs: i.obs || '', ct: 0, usuario: x.atendidoPor || '', ms: x.atendidoMs || 0, tipoSol: x.tipo === 'LIMPIEZA' ? 'LIMPIEZA' : 'ESCRITORIO'
       })));
     SAL.lista = s.docs.map(d => ({ id: d.id, ...d.data() }))
       .filter(m => (m.tipo === 'SALIDA' && m.origen !== 'ANULACION') || (m.tipo === 'AJUSTE' && m.origen !== 'SALDO INICIAL'))
+      .map(m => m.solicitudId && tipoDeSol.has(m.solicitudId) ? { ...m, tipoSol: tipoDeSol.get(m.solicitudId) } : m)
       .concat(noAt)
       .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.ms || 0) - (a.ms || 0));
     pintarSalidas();
-  } catch (e) { $('sFilas').innerHTML = `<tr><td colspan="11"><div class="aviso error">${esc(errorTexto(e))}</div></td></tr>`; }
+  } catch (e) { $('sFilas').innerHTML = `<div class="aviso error">${esc(errorTexto(e))}</div>`; }
 }
 function filtrarSalidas() {
   const t = $('sTipo').value, q = norm($('sBuscar').value);
   return SAL.lista.filter(m => (!t || (t === 'NOAT' ? m.noAt : m.tipo === t)) && (!q || norm([m.codigo, m.producto, nombreCC(m.tercero), m.persona, m.documento, m.obs].join(' ')).includes(q)));
 }
+// Una fila de material (en la lista de ajustes y dentro de cada entrega desplegada)
+function filaSalida(m, conDestino) {
+  const adm = YO.rol === 'ADMIN', parcial = !m.noAt && m.cantSol && m.cant < m.cantSol;
+  const tipo = m.tipo === 'AJUSTE' ? '' : tipoSalida(m) === 'LIMPIEZA' ? '🧽' : '✏️';
+  return `<tr class="${m.noAt ? 'sol-no' : parcial ? 'sol-parcial' : ''}">${conDestino ? `<td>${fmtF(m.fecha)}</td>` : `<td title="${tipo === '🧽' ? 'Limpieza' : 'Escritorio'}">${tipo}</td>`}<td>${esc(m.codigo)}</td><td>${esc(m.producto)}${m.tipo === 'AJUSTE' ? ` <span class="pill AJUSTE">${esc(m.origen)}</span>` : ''}${m.noAt ? ' <span class="pill RECHAZADO">NO ATENDIDO</span>' : ''}</td>
+    <td class="num">${m.noAt ? `<b>0</b> <small class="nota">de ${nq(m.cantSol)} ${esc(m.unidad || '')}</small>` : `<b>${nq(m.cant)}</b> <small class="nota">${esc(m.unidad || '')}${parcial ? ` de ${nq(m.cantSol)}` : ''}</small>`}</td>
+    ${conDestino ? `<td>${esc(nombreCC(m.tercero))}</td>` : ''}<td>${esc(m.documento || '')}</td><td>${m.obs ? `<span class="obs-txt">${esc(m.obs)}</span>` : ''}</td>
+    <td class="num">${m.noAt ? '' : n2(m.ct)}</td><td><small>${esc(m.usuario || '')}</small></td><td>${adm && !m.noAt ? `<button class="btn peligro chico" type="button" data-sdel="${esc(m.id)}">Eliminar</button>` : ''}</td></tr>`;
+}
+const tipoSalida = m => m.tipoSol || (/LIMPIEZA/i.test(PRODUCTOS.get(m.productoId)?.categoria || '') ? 'LIMPIEZA' : 'ESCRITORIO');
+const numsSol = l => [...new Set(l.map(m => (/N\.º\s*(\d+)/.exec(m.documento || '') || [])[1]).filter(Boolean))].sort((a, b) => a - b);
+// Las salidas se agrupan por sucursal y fecha (una entrega); cada entrega se despliega y se imprime
 function pintarSalidas() {
-  const l = filtrarSalidas(), adm = YO.rol === 'ADMIN';
-  const tot = r2(l.filter(m => m.tipo === 'SALIDA').reduce((a, m) => a + (m.ct || 0), 0));
-  const nNo = l.filter(m => m.noAt).length;
-  $('sRes').innerHTML = `<span><b>${l.length - nNo}</b> movimientos</span>${nNo ? `<span style="color:var(--rojo)">No atendidos: <b>${nNo}</b></span>` : ''}<span>Costo de lo entregado: <b>S/ ${n2(tot)}</b></span>`;
-  $('sFilas').innerHTML = l.length ? l.map(m => {
-    const parcial = !m.noAt && m.cantSol && m.cant < m.cantSol;
-    return `<tr class="${m.noAt ? 'sol-no' : parcial ? 'sol-parcial' : ''}"><td>${fmtF(m.fecha)}</td><td>${esc(m.codigo)}</td><td>${esc(m.producto)}${m.tipo === 'AJUSTE' ? ` <span class="pill AJUSTE">${esc(m.origen)}</span>` : ''}${m.noAt ? ' <span class="pill RECHAZADO">NO ATENDIDO</span>' : ''}</td>
-      <td class="num">${m.noAt ? `<b>0</b> <small class="nota">de ${nq(m.cantSol)} ${esc(m.unidad || '')}</small>` : `<b>${nq(m.cant)}</b> <small class="nota">${esc(m.unidad || '')}${parcial ? ` de ${nq(m.cantSol)}` : ''}</small>`}</td><td>${esc(nombreCC(m.tercero))}</td><td>${esc(m.persona || '')}</td><td>${esc(m.documento || '')}</td>
-      <td>${m.obs ? `<span class="obs-txt">${esc(m.obs)}</span>` : ''}</td>
-      <td class="num">${m.noAt ? '' : n2(m.ct)}</td><td><small>${esc(m.usuario || '')}</small></td><td>${adm && !m.noAt ? `<button class="btn peligro chico" type="button" data-sdel="${esc(m.id)}">Eliminar</button>` : ''}</td></tr>`;
-  }).join('')
-    : '<tr><td colspan="11" class="vacio">No hay salidas con este filtro.</td></tr>';
+  const l = filtrarSalidas(), t = $('sTipo').value;
+  const tot = r2(l.filter(m => m.tipo === 'SALIDA').reduce((a, m) => a + (m.ct || 0), 0)), nNo = l.filter(m => m.noAt).length;
+  if (t === 'AJUSTE') { // ajustes: lista simple
+    $('sRes').innerHTML = `<span><b>${l.length}</b> ajustes</span>`;
+    $('sFilas').innerHTML = l.length ? `<table class="lst"><thead><tr><th>Fecha</th><th>Código</th><th>Producto</th><th class="num">Cantidad</th><th>Destino</th><th>Motivo / documento</th><th>Observación</th><th class="num">Costo total</th><th>Registró</th><th></th></tr></thead><tbody>${l.map(m => filaSalida(m, true)).join('')}</tbody></table>` : '<div class="vacio">No hay ajustes con este filtro.</div>';
+    return;
+  }
+  const grupos = new Map();
+  l.forEach(m => { const k = `${m.tipo === 'AJUSTE' ? '~AJUSTE' : m.tercero || ''}|${m.fecha}`; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(m); });
+  const lista = [...grupos.entries()].sort((a, b) => b[0].split('|')[1].localeCompare(a[0].split('|')[1]) || a[0].localeCompare(b[0], 'es', { numeric: true }));
+  SAL.grupos = new Map(lista);
+  $('sRes').innerHTML = `<span><b>${lista.length}</b> entregas</span><span><b>${l.length - nNo}</b> materiales entregados</span>${nNo ? `<span style="color:var(--rojo)">No atendidos: <b>${nNo}</b></span>` : ''}<span>Costo de lo entregado: <b>S/ ${n2(tot)}</b></span>`;
+  $('sFilas').innerHTML = lista.length ? `<table class="lst ent"><thead><tr><th></th><th>Fecha</th><th>Sucursal / centro de costo</th><th>Solicitudes</th><th class="opc">Recibió</th><th class="num">Materiales</th><th class="num">Costo total</th><th></th></tr></thead><tbody>${lista.map(([k, ms]) => {
+    const [cc, f] = k.split('|'), aj = cc === '~AJUSTE', abierto = SAL.abiertos.has(k);
+    const ent = ms.filter(m => !m.noAt), no = ms.length - ent.length, total = r2(ent.reduce((a, m) => a + (m.ct || 0), 0));
+    const nums = numsSol(ms), tipos = n => [...new Set(ms.filter(m => (m.documento || '').includes('N.º ' + n)).map(tipoSalida))].map(x => x === 'LIMPIEZA' ? '🧽' : '✏️').join('');
+    const sols = aj ? '<span class="nota">Ajustes de inventario</span>' : nums.length ? nums.map(n => `<span>N.º ${n} ${tipos(n)}</span>`).join('') + (ms.some(m => !/N\.º/.test(m.documento || '')) ? '<span class="nota">+ salida manual</span>' : '') : '<span class="nota">Salida manual</span>';
+    const fila = `<tr class="grp${abierto ? ' abierto' : ''}" data-sg="${esc(k)}"><td class="flecha">${abierto ? '▾' : '▸'}</td><td>${fmtF(f)}</td><td><b>${esc(aj ? 'AJUSTE DE INVENTARIO' : nombreCC(cc) || 'SIN DESTINO')}</b></td><td class="sols">${sols}</td>
+      <td class="opc">${esc([...new Set(ms.map(m => m.persona).filter(Boolean))].join(', '))}</td><td class="num">${ent.length}${no ? `<span class="sub" style="color:var(--rojo)">${no} no atendido${no > 1 ? 's' : ''}</span>` : ''}</td><td class="num"><b>S/ ${n2(total)}</b></td>
+      <td>${aj ? '' : `<button class="btn chico" type="button" data-simp="${esc(k)}" title="Imprime esta entrega en una hoja">Imprimir</button>`}</td></tr>`;
+    const det = abierto ? `<tr class="det"><td colspan="8"><table><thead><tr><th></th><th>Código</th><th>Material</th><th class="num">Cantidad</th><th>Documento</th><th>Observación</th><th class="num">Costo total</th><th>Registró</th><th></th></tr></thead><tbody>${ms.slice().sort((a, b) => tipoSalida(a).localeCompare(tipoSalida(b)) || (a.documento || '').localeCompare(b.documento || '')).map(m => filaSalida(m, false)).join('')}</tbody></table></td></tr>` : '';
+    return fila + det;
+  }).join('')}</tbody></table><div class="lst-pie">Total — ${lista.length} entregas</div>` : '<div class="vacio">No hay salidas con este filtro.</div>';
 }
 $('sMes').addEventListener('change', cargarSalidas);
-// Imprimir lo entregado a una sucursal en una sola hoja (escritorio arriba, limpieza abajo)
-$('sDia').addEventListener('change', () => { const d = $('sDia').value; if (d && d.slice(0, 7) !== $('sMes').value) { $('sMes').value = d.slice(0, 7); cargarSalidas(); } });
-$('sImpSuc').addEventListener('click', async e => {
-  const c = $('sSuc').value, dia = $('sDia').value; if (!c) return toast('Elige la sucursal que quieres imprimir.', true);
-  const nom = $('sSuc').selectedOptions[0].textContent;
-  const movs = SAL.lista.filter(m => m.tipo === 'SALIDA' && String(m.tercero) === c && (!dia || m.fecha === dia));
-  if (!movs.length) return toast(`No hay salidas para ${nom} ${dia ? 'el ' + fmtF(dia) : 'en el mes elegido'}.`, true);
-  const b = e.currentTarget; ocupado(b, true, 'Preparando…');
+// Imprimir una entrega (sucursal + fecha) en una sola hoja: escritorio arriba y limpieza abajo
+async function imprimirEntrega(c, dia, b) {
+  const nom = nombreCC(c) || c;
+  const movs = SAL.lista.filter(m => m.tipo === 'SALIDA' && String(m.tercero) === String(c) && (!dia || m.fecha === dia));
+  if (!movs.length) return toast(`No hay salidas para ${nom}.`, true);
+  ocupado(b, true, '…');
   try {
     // datos de las solicitudes de origen (N.º y fecha de solicitud), si las salidas vinieron de una
     const sols = new Map();
@@ -2324,7 +2343,6 @@ $('sImpSuc').addEventListener('click', async e => {
     const unicos = v => [...new Set(v.filter(Boolean))];
     const grupo = tipo => {
       const ms = movs.filter(m => tipoDe(m) === tipo).sort((a, b2) => (a.fecha || '').localeCompare(b2.fecha || '') || (a.ms || 0) - (b2.ms || 0)); if (!ms.length) return [];
-      // una entrada por día de entrega; la hoja junta los días y los N.º de solicitud sin repetirlos
       return unicos(ms.map(m => m.fecha)).map(f => {
         const md = ms.filter(m => m.fecha === f), ss = unicos(md.map(m => m.solicitudId)).map(id => sols.get(id)).filter(Boolean);
         return {
@@ -2338,11 +2356,15 @@ $('sImpSuc').addEventListener('click', async e => {
     imprimirSucursalUnaHoja(nom, [...grupo('ESCRITORIO'), ...grupo('LIMPIEZA')]);
   } catch (err) { toast(errorTexto(err), true); }
   ocupado(b, false);
-});
+}
 ['sTipo', 'sBuscar'].forEach(i => $(i).addEventListener('input', pintarSalidas));
 $('sCsv').addEventListener('click', () => descargarCSV(`salidas_${$('sMes').value}.csv`, [['Fecha', 'Estado', 'Código', 'Producto', 'Cant. pedida', 'Cant. entregada', 'Unidad', 'Centro de costo', 'Entregado a', 'Documento', 'Observación', 'Costo unit.', 'Costo total', 'Registró']]
   .concat(filtrarSalidas().map(m => [fmtF(m.fecha), m.noAt ? 'NO ATENDIDO' : m.tipo === 'AJUSTE' ? m.origen : m.cantSol && m.cant < m.cantSol ? 'PARCIAL' : 'ENTREGADO', m.codigo || '', m.producto, m.cantSol ? String(m.cantSol).replace('.', ',') : '', String(m.cant).replace('.', ','), m.unidad || '', nombreCC(m.tercero), m.persona || '', m.documento || '', m.obs || '', m.noAt ? '' : numCSV(m.cu), m.noAt ? '' : numCSV(m.ct), m.usuario || '']))));
 $('sFilas').addEventListener('click', async e => {
+  const imp = e.target.closest('[data-simp]');
+  if (imp) { const [c, f] = imp.dataset.simp.split('|'); return imprimirEntrega(c, f, imp); }
+  const g = e.target.closest('tr.grp');
+  if (g && !e.target.closest('button')) { const k = g.dataset.sg; if (SAL.abiertos.has(k)) SAL.abiertos.delete(k); else SAL.abiertos.add(k); return pintarSalidas(); }
   const b = e.target.closest('[data-sdel]'); if (!b) return;
   const m = SAL.lista.find(x => x.id === b.dataset.sdel); if (!m) return;
   if (!confirm(`¿Eliminar esta salida?\n${fmtF(m.fecha)} · ${m.producto} · ${nq(m.cant)} ${m.unidad || ''} · ${nombreCC(m.tercero)}\n\nEl stock y el kardex se recalculan solos.`)) return;
